@@ -22,7 +22,9 @@
       FILE_PREVIEW_CONTAINER: '.file-preview-container',
       VIDEO_PREVIEW_BUTTON: 'button[data-test-id="video-preview-button"]',
       VIDEO_PLAYER: 'video[data-test-id="video-player"]',
-      USER_QUERY_TEXT: '.query-text'
+      USER_QUERY_TEXT: '.query-text',
+      IMAGE_PREVIEW: 'img[data-test-id="uploaded-img"]',
+      ACTION_CARD: 'action-card'
     },
 
     TIMING: {
@@ -195,9 +197,86 @@
       return videoUrls;
     }
 
+    extractImageUrls(userQueryElem) {
+      const imageUrls = [];
+      const fileContainer = userQueryElem.querySelector(CONFIG.SELECTORS.FILE_PREVIEW_CONTAINER);
+      if (!fileContainer) {
+        return imageUrls;
+      }
+
+      const imageElements = userQueryElem.querySelectorAll(CONFIG.SELECTORS.IMAGE_PREVIEW);
+      imageElements.forEach(img => {
+        const imageUrl = img.src;
+        if (imageUrl) {
+          imageUrls.push(imageUrl);
+        }
+      });
+
+      return imageUrls;
+    }
+
+    async extractFiles(userQueryElem) {
+      const files = [];
+      const fileContainer = userQueryElem.querySelector(CONFIG.SELECTORS.FILE_PREVIEW_CONTAINER);
+      if (!fileContainer) {
+        return files;
+      }
+
+      // Get all file preview elements in order
+      const filePreviews = fileContainer.querySelectorAll('user-query-file-preview');
+
+      for (const preview of filePreviews) {
+        // Check if it's a video
+        const videoButton = preview.querySelector(CONFIG.SELECTORS.VIDEO_PREVIEW_BUTTON);
+        if (videoButton) {
+          try {
+            videoButton.click();
+
+            let videoPlayer = null;
+            const startTime = Date.now();
+            while (!videoPlayer && (Date.now() - startTime) < CONFIG.TIMING.VIDEO_LOAD_TIMEOUT) {
+              await Utils.sleep(CONFIG.TIMING.VIDEO_LOAD_DELAY);
+              videoPlayer = document.querySelector(CONFIG.SELECTORS.VIDEO_PLAYER);
+            }
+
+            if (videoPlayer) {
+              const sourceElem = videoPlayer.querySelector('source');
+              const videoUrl = sourceElem?.src || videoPlayer.src;
+              if (videoUrl) {
+                files.push({ type: 'video', url: videoUrl });
+              }
+            }
+
+            await Utils.sleep(CONFIG.TIMING.LIGHTBOX_CLOSE_DELAY);
+            document.querySelector('button[mat-dialog-close]').click();
+            await Utils.sleep(CONFIG.TIMING.LIGHTBOX_CLOSE_DELAY);
+          } catch (e) {
+            console.error('Error extracting video URL:', e);
+          }
+          continue;
+        }
+
+        // Check if it's an image
+        const imageElement = preview.querySelector(CONFIG.SELECTORS.IMAGE_PREVIEW);
+        if (imageElement) {
+          const imageUrl = imageElement.src;
+          if (imageUrl) {
+            files.push({ type: 'image', url: imageUrl });
+          }
+        }
+      }
+
+      return files;
+    }
+
     getConversationTitle() {
       const titleCard = document.querySelector(CONFIG.SELECTORS.CONVERSATION_TITLE);
       return titleCard ? titleCard.textContent.trim() : 'Untitled Conversation';
+    }
+
+    hasActionCard(modelRespElem) {
+      if (!modelRespElem) return false;
+      return modelRespElem.querySelector(CONFIG.SELECTORS.ACTION_CARD) !== null;
     }
 
     async buildJSON(turns, conversationTitle) {
@@ -207,6 +286,13 @@
         const turn = turns[i];
         Utils.createNotification(`Processing message ${i + 1} of ${turns.length}...`);
 
+        // Check if model response has action-card
+        const modelRespElem = turn.querySelector(CONFIG.SELECTORS.MODEL_RESPONSE);
+        if (this.hasActionCard(modelRespElem)) {
+          // Skip this turn entirely (both user query and model response)
+          continue;
+        }
+
         // User message
         const userQueryElem = turn.querySelector(CONFIG.SELECTORS.USER_QUERY);
         if (userQueryElem) {
@@ -214,8 +300,8 @@
             role: 'user'
           };
 
-          // Extract videos
-          const videoUrls = await this.extractVideoUrls(userQueryElem);
+          // Extract files (videos and images in order)
+          const files = await this.extractFiles(userQueryElem);
 
           // Extract text
           const queryTextElem = userQueryElem.querySelector(CONFIG.SELECTORS.USER_QUERY_TEXT);
@@ -224,9 +310,9 @@
             : userQueryElem.textContent.trim();
 
           // Determine content type and set fields
-          if (videoUrls.length > 0) {
+          if (files.length > 0) {
             userMessage.content_type = 'mixed';
-            userMessage.videos = videoUrls;
+            userMessage.files = files;
           } else {
             userMessage.content_type = 'text';
           }
@@ -236,7 +322,6 @@
         }
 
         // Model response
-        const modelRespElem = turn.querySelector(CONFIG.SELECTORS.MODEL_RESPONSE);
         if (modelRespElem) {
           modelRespElem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
           await Utils.sleep(CONFIG.TIMING.MOUSEOVER_DELAY);
