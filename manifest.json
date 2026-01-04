@@ -5,11 +5,17 @@
   "version": "1.0.0",
   "permissions": [
     "clipboardRead",
-    "storage"
+    "storage",
+    "downloads"
   ],
   "host_permissions": [
-    "https://gemini.google.com/*"
+    "https://gemini.google.com/*",
+    "https://contribution.usercontent.google.com/*",
+    "https://lh3.googleusercontent.com/*"
   ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

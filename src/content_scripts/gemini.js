@@ -279,8 +279,9 @@
       return modelRespElem.querySelector(CONFIG.SELECTORS.ACTION_CARD) !== null;
     }
 
-    async buildJSON(turns, conversationTitle) {
+    async buildJSON(turns, conversationTitle, conversationId) {
       const data = [];
+      const videosToDownload = [];
 
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
@@ -302,6 +303,19 @@
 
           // Extract files (videos and images in order)
           const files = await this.extractFiles(userQueryElem);
+
+          // Collect videos for later download
+          if (files.length > 0) {
+            const videos = files.filter(f => f.type === 'video');
+            videos.forEach((video, videoIndex) => {
+              videosToDownload.push({
+                url: video.url,
+                conversationId: conversationId,
+                messageIndex: i,
+                fileIndex: videoIndex
+              });
+            });
+          }
 
           // Extract text
           const queryTextElem = userQueryElem.querySelector(CONFIG.SELECTORS.USER_QUERY_TEXT);
@@ -348,10 +362,13 @@
       const totalCount = data.length;
 
       return {
-        title: conversationTitle,
-        round_count: roundCount,
-        total_count: totalCount,
-        data: data
+        jsonData: {
+          title: conversationTitle,
+          round_count: roundCount,
+          total_count: totalCount,
+          data: data
+        },
+        videosToDownload: videosToDownload
       };
     }
 
@@ -380,13 +397,60 @@
         const conversationTitle = this.getConversationTitle();
         const conversationId = Utils.getConversationIdFromURL();
 
-        const jsonData = await this.buildJSON(turns, conversationTitle);
-        await this.exportToFile(jsonData, conversationId);
+        // Build JSON and collect video information
+        const result = await this.buildJSON(turns, conversationTitle, conversationId);
 
-        Utils.createNotification('Export completed!');
+        // Export JSON file
+        await this.exportToFile(result.jsonData, conversationId);
+        Utils.createNotification('JSON export completed!');
+
+        // Download videos after JSON export
+        if (result.videosToDownload.length > 0) {
+          Utils.createNotification(`Starting download of ${result.videosToDownload.length} video(s)...`);
+          await this.batchDownloadVideos(result.videosToDownload);
+          Utils.createNotification('All downloads initiated!');
+        } else {
+          Utils.createNotification('Export completed!');
+        }
       } catch (error) {
         console.error('Export error:', error);
         alert(`Export failed: ${error.message}`);
+      }
+    }
+
+    async batchDownloadVideos(videosToDownload) {
+      for (let i = 0; i < videosToDownload.length; i++) {
+        const videoInfo = videosToDownload[i];
+        try {
+          // Extract filename from URL
+          const urlParams = new URLSearchParams(new URL(videoInfo.url).search);
+          const filename = urlParams.get('filename') || null;
+
+          // Send download request to background service worker
+          const response = await chrome.runtime.sendMessage({
+            type: 'DOWNLOAD_VIDEO',
+            data: {
+              url: videoInfo.url,
+              filename: filename,
+              conversationId: videoInfo.conversationId,
+              messageIndex: videoInfo.messageIndex,
+              fileIndex: videoInfo.fileIndex
+            }
+          });
+
+          if (response.success) {
+            console.log(`Video ${i + 1}/${videosToDownload.length} download initiated: ${filename || 'video'} (ID: ${response.downloadId})`);
+          } else {
+            console.error(`Video ${i + 1}/${videosToDownload.length} download failed: ${response.error}`);
+          }
+
+          // Delay between downloads to avoid Chrome's multiple-download confirmation
+          if (i < videosToDownload.length - 1) {
+            await Utils.sleep(500);
+          }
+        } catch (error) {
+          console.error(`Error downloading video ${i + 1}/${videosToDownload.length}:`, error);
+        }
       }
     }
   }
