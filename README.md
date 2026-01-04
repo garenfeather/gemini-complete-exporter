@@ -1,19 +1,15 @@
 # Gemini 聊天导出工具
 
-Chrome 扩展，支持将 Gemini 聊天记录导出为 Markdown 格式，完美保留 LaTeX 公式、代码和格式。
+Chrome 扩展，一键导出 Gemini 聊天记录为 JSON 格式，支持视频链接提取。
 
 ## 功能特性
 
-- 导出 Gemini 完整对话为 Markdown 格式
-- 完美保留代码、表格、LaTeX 公式等格式
-- **支持导出用户上传的视频**（自动提取视频链接）
-- 选择性导出：通过复选框选择要导出的消息
-- 快捷选择：全部/仅回复/自定义
-- 导出方式：下载文件 或 复制到剪贴板
-- 自定义文件名（可选，默认使用对话标题或时间戳）
-- 自动移除引用标记
-- 深色模式支持
-- 开源（Apache License 2.0）
+- 一键导出完整 Gemini 对话为 JSON 格式
+- 自动提取用户上传的视频链接
+- 智能识别内容类型（纯文本/混合内容）
+- 统计对话轮数和消息总数
+- 使用对话 ID 命名导出文件
+- 简洁交互，无配置界面
 
 ## 安装
 
@@ -21,25 +17,56 @@ Chrome 扩展，支持将 Gemini 聊天记录导出为 Markdown 格式，完美�
 2. 打开 Chrome 浏览器，访问 `chrome://extensions`
 3. 开启右上角"开发者模式"
 4. 点击"加载已解压的扩展程序"，选择项目文件夹
-5. 完成
 
 ## 使用
 
 1. 打开 [Gemini](https://gemini.google.com/) 聊天页面
-2. 点击右上角"Export Chat"按钮
-3. 选择要导出的消息（使用下拉菜单或复选框）
-4. 选择导出方式：
-   - **导出为文件**：下载 Markdown 文件
-   - **导出到剪贴板**：复制内容
-5. （可选）输入自定义文件名
-6. 等待导出完成
+2. 点击左下角 "Export" 按钮
+3. 自动下载 `{对话ID}.json` 文件
 
-### 视频导出说明
+## JSON 格式
 
-- 自动检测用户上传的视频
-- 在导出的 Markdown 中插入视频下载链接
-- 链接文本使用原始文件名
-- 格式：`[文件名.mp4](视频链接)`
+```json
+{
+  "title": "对话标题",
+  "round_count": 1,
+  "total_count": 2,
+  "data": [
+    {
+      "role": "user",
+      "content_type": "mixed",
+      "content": "文本内容",
+      "videos": [
+        "https://..."
+      ]
+    },
+    {
+      "role": "assistant",
+      "content_type": "text",
+      "content": "AI 回复内容"
+    }
+  ]
+}
+```
+
+### 字段说明
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `title` | string | 对话标题 |
+| `round_count` | number | 对话轮数（1 用户 + 1 助手 = 1 轮） |
+| `total_count` | number | 消息总数（用户 + 助手） |
+| `data` | array | 消息列表 |
+| `role` | string | `"user"` 或 `"assistant"` |
+| `content_type` | string | `"text"` 或 `"mixed"` |
+| `content` | string | 消息文本内容 |
+| `videos` | array | 视频链接数组（仅在有视频时存在） |
+
+### 动态字段规则
+
+- **无视频**：不包含 `videos` 字段
+- **有视频**：`content_type` 自动设为 `"mixed"`，包含 `videos` 数组
+- **纯文本**：`content_type` 为 `"text"`
 
 ## 权限说明
 
