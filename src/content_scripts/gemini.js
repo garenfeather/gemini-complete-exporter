@@ -264,12 +264,12 @@
     static createButton() {
       const btn = document.createElement('button');
       btn.id = CONFIG.BUTTON_ID;
-      btn.textContent = 'Export Chat';
-      
+      btn.textContent = 'Export';
+
       Object.assign(btn.style, {
         position: 'fixed',
-        top: '80px',
-        right: '20px',
+        bottom: '24px',
+        left: '180px',
         zIndex: '9999',
         padding: '8px 16px',
         background: CONFIG.STYLES.BUTTON_PRIMARY,
@@ -292,12 +292,12 @@
     static createDropdown() {
       const dropdown = document.createElement('div');
       dropdown.id = CONFIG.DROPDOWN_ID;
-      
+
       const isDark = Utils.isDarkMode();
       Object.assign(dropdown.style, {
         position: 'fixed',
-        top: '124px',
-        right: '20px',
+        bottom: '70px',
+        left: '180px',
         zIndex: '9999',
         border: '1px solid #ccc',
         borderRadius: '6px',
