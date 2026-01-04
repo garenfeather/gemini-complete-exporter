@@ -23,7 +23,12 @@
       USER_QUERY: 'user-query',
       MODEL_RESPONSE: 'model-response',
       COPY_BUTTON: 'button[data-test-id="copy-button"]',
-      CONVERSATION_TITLE: '.conversation-title'
+      CONVERSATION_TITLE: '.conversation-title',
+      // Video related selectors
+      FILE_PREVIEW_CONTAINER: '.file-preview-container',
+      VIDEO_PREVIEW_BUTTON: 'button[data-test-id="video-preview-button"]',
+      VIDEO_PLAYER: 'video[data-test-id="video-player"]',
+      USER_QUERY_TEXT: '.query-text'
     },
     
     TIMING: {
@@ -34,7 +39,11 @@
       POPUP_DURATION: 900,
       MAX_SCROLL_ATTEMPTS: 60,
       MAX_STABLE_SCROLLS: 4,
-      MAX_CLIPBOARD_ATTEMPTS: 10
+      MAX_CLIPBOARD_ATTEMPTS: 10,
+      // Video related timing
+      VIDEO_LOAD_DELAY: 500,
+      VIDEO_LOAD_TIMEOUT: 5000,
+      LIGHTBOX_CLOSE_DELAY: 300
     },
     
     STYLES: {
@@ -370,6 +379,53 @@
       return clipboardText;
     }
 
+    async extractVideoUrls(userQueryElem) {
+      const videoUrls = [];
+      const fileContainer = userQueryElem.querySelector(CONFIG.SELECTORS.FILE_PREVIEW_CONTAINER);
+      if (!fileContainer) {
+        return videoUrls;
+      }
+
+      const videoButtons = userQueryElem.querySelectorAll(CONFIG.SELECTORS.VIDEO_PREVIEW_BUTTON);
+      if (videoButtons.length === 0) {
+        return videoUrls;
+      }
+
+      for (const btn of videoButtons) {
+        try {
+          // Click to open lightbox
+          btn.click();
+
+          // Wait for video player to load
+          let videoPlayer = null;
+          const startTime = Date.now();
+          while (!videoPlayer && (Date.now() - startTime) < CONFIG.TIMING.VIDEO_LOAD_TIMEOUT) {
+            await Utils.sleep(CONFIG.TIMING.VIDEO_LOAD_DELAY);
+            videoPlayer = document.querySelector(CONFIG.SELECTORS.VIDEO_PLAYER);
+          }
+
+          if (videoPlayer) {
+            // Extract video URL from source element
+            const sourceElem = videoPlayer.querySelector('source');
+            const videoUrl = sourceElem?.src || videoPlayer.src;
+            if (videoUrl) {
+              videoUrls.push(videoUrl);
+            }
+          }
+
+          // Close lightbox by clicking the back button
+          await Utils.sleep(CONFIG.TIMING.LIGHTBOX_CLOSE_DELAY);
+          document.querySelector('button[mat-dialog-close]').click();
+          await Utils.sleep(CONFIG.TIMING.LIGHTBOX_CLOSE_DELAY);
+
+        } catch (e) {
+          console.error('Error extracting video URL:', e);
+        }
+      }
+
+      return videoUrls;
+    }
+
     getConversationTitle() {
       const titleCard = document.querySelector(CONFIG.SELECTORS.CONVERSATION_TITLE);
       return titleCard ? titleCard.textContent.trim() : '';
@@ -414,8 +470,37 @@
         if (userQueryElem) {
           const cb = userQueryElem.querySelector(`.${CONFIG.CHECKBOX_CLASS}`);
           if (cb?.checked) {
-            const userQuery = userQueryElem.textContent.trim();
-            markdown += `## 👤 You\n\n${userQuery}\n\n`;
+            let userContent = '';
+
+            // Extract video URLs if any
+            const videoUrls = await this.extractVideoUrls(userQueryElem);
+            if (videoUrls.length > 0) {
+              userContent += videoUrls.map(url => {
+                // Extract filename from URL
+                let displayName = '上传视频';
+                try {
+                  const urlObj = new URL(url);
+                  const filenameParam = urlObj.searchParams.get('filename');
+                  if (filenameParam) {
+                    displayName = decodeURIComponent(filenameParam.replace(/\+/g, ' '));
+                  }
+                } catch (e) {
+                  // If URL parsing fails, use default name
+                }
+                return `[${displayName}](${url})`;
+              }).join('\n') + '\n\n';
+            }
+
+            // Extract text content (use .query-text if available, otherwise fallback to textContent)
+            const queryTextElem = userQueryElem.querySelector(CONFIG.SELECTORS.USER_QUERY_TEXT);
+            const userText = queryTextElem
+              ? queryTextElem.textContent.trim()
+              : userQueryElem.textContent.trim();
+            if (userText) {
+              userContent += userText;
+            }
+
+            markdown += `## 👤 You\n\n${userContent}\n\n`;
           }
         }
 
