@@ -219,19 +219,16 @@
       const files = [];
       const fileContainer = userQueryElem.querySelector(CONFIG.SELECTORS.FILE_PREVIEW_CONTAINER);
       if (!fileContainer) {
-        console.log('[Gemini Export] No file container found');
         return files;
       }
 
       // Get all file preview elements in order
       const filePreviews = fileContainer.querySelectorAll('user-query-file-preview');
-      console.log(`[Gemini Export] Found ${filePreviews.length} file previews`);
 
       for (const preview of filePreviews) {
         // Check if it's a video
         const videoButton = preview.querySelector(CONFIG.SELECTORS.VIDEO_PREVIEW_BUTTON);
         if (videoButton) {
-          console.log('[Gemini Export] Found video');
           try {
             videoButton.click();
 
@@ -246,7 +243,6 @@
               const sourceElem = videoPlayer.querySelector('source');
               const videoUrl = sourceElem?.src || videoPlayer.src;
               if (videoUrl) {
-                console.log('[Gemini Export] Extracted video URL:', videoUrl);
                 files.push({ type: 'video', url: videoUrl });
               }
             }
@@ -264,16 +260,12 @@
         const imageElement = preview.querySelector(CONFIG.SELECTORS.IMAGE_PREVIEW);
         if (imageElement) {
           const imageUrl = imageElement.src;
-          console.log('[Gemini Export] Found image element, URL:', imageUrl);
           if (imageUrl) {
             files.push({ type: 'image', url: imageUrl });
           }
-        } else {
-          console.log('[Gemini Export] No image element found in preview');
         }
       }
 
-      console.log(`[Gemini Export] Total files extracted: ${files.length}`, files);
       return files;
     }
 
