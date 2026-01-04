@@ -1,51 +1,51 @@
-# Gemini Chat Exporter
+# Gemini 聊天导出工具
 
-Gemini Chat Exporter is a Chrome Extension that allows you to export your Gemini chat conversation to a well-formatted Markdown file or copy it to your clipboard—with perfect preservation of LaTeX math, code, and formatting.
+Chrome 扩展，支持将 Gemini 聊天记录导出为 Markdown 格式，完美保留 LaTeX 公式、代码和格式。
 
-## Features
+## 功能特性
 
-- Export your full Gemini chat conversation to Markdown, preserving formatting (code, tables, LaTeX, etc.)
-- Dedicated "Export Chat" button appears automatically on every Gemini chat page
-- Option to hide the export button via the extension popup
-- Granular message selection: Use checkboxes next to each message to select exactly what to export
-- Selection presets: Instantly select all, none, or only AI responses with a dropdown
-- Export to clipboard: Copy your chat as Markdown directly to your clipboard
-- Custom filename (optional): Enter a filename, or leave blank to use the chat title or a timestamp
-- Removes citation markers automatically
-- Dark mode support
-- No build step required
-- Open source under the Apache License 2.0
+- 导出 Gemini 完整对话为 Markdown 格式
+- 完美保留代码、表格、LaTeX 公式等格式
+- **支持导出用户上传的视频**（自动提取视频链接）
+- 选择性导出：通过复选框选择要导出的消息
+- 快捷选择：全部/仅回复/自定义
+- 导出方式：下载文件 或 复制到剪贴板
+- 自定义文件名（可选，默认使用对话标题或时间戳）
+- 自动移除引用标记
+- 深色模式支持
+- 开源（Apache License 2.0）
 
-## Installation
+## 安装
 
-1. **Download the extension**
-   - Clone or download this repository
-   - Unzip to a folder on your computer
+1. 下载或克隆本仓库
+2. 打开 Chrome 浏览器，访问 `chrome://extensions`
+3. 开启右上角"开发者模式"
+4. 点击"加载已解压的扩展程序"，选择项目文件夹
+5. 完成
 
-2. **Load the extension in Chrome**
-   - Open `chrome://extensions` in your Chrome browser
-   - Enable "Developer mode" (toggle in the top right)
-   - Click "Load unpacked" and select the extension folder
+## 使用
 
-3. **You're done!**
-   - The "Export Chat" button will now appear on every Gemini chat page
+1. 打开 [Gemini](https://gemini.google.com/) 聊天页面
+2. 点击右上角"Export Chat"按钮
+3. 选择要导出的消息（使用下拉菜单或复选框）
+4. 选择导出方式：
+   - **导出为文件**：下载 Markdown 文件
+   - **导出到剪贴板**：复制内容
+5. （可选）输入自定义文件名
+6. 等待导出完成
 
-## Usage
+### 视频导出说明
 
-1. Go to [Gemini](https://gemini.google.com/) and open any chat conversation.
-2. Click the "Export Chat" button at the top right of the page.
-3. Use the **Select messages** dropdown to quickly select "All", "Only answers" (AI responses), or "None". You can also manually check/uncheck any message using the checkboxes.
-4. Choose your export mode: "Export as file" (default) or "Export to clipboard".
-5. Optionally enter a filename, or leave blank to automatically use the conversation title or timestamp.
-6. Wait for the export to complete.
-7. The Markdown file will be downloaded or copied to your clipboard.
+- 自动检测用户上传的视频
+- 在导出的 Markdown 中插入视频下载链接
+- 链接文本使用原始文件名
+- 格式：`[文件名.mp4](视频链接)`
 
-## Permissions
+## 权限说明
 
-This extension requires:
-- `clipboardRead`: To copy Gemini responses using the built-in copy button for perfectly formatted content
-- `storage`: For extension settings
+- `clipboardRead`：读取剪贴板以获取 Gemini 回复的完整格式
+- `storage`：保存扩展设置
 
-## License
+## 许可证
 
-This project is licensed under the [Apache License 2.0](LICENSE).
+[Apache License 2.0](LICENSE)
