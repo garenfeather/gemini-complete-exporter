@@ -282,6 +282,7 @@
     async buildJSON(turns, conversationTitle, conversationId) {
       const data = [];
       const videosToDownload = [];
+      const imagesToDownload = [];
 
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
@@ -304,7 +305,7 @@
           // Extract files (videos and images in order)
           const files = await this.extractFiles(userQueryElem);
 
-          // Collect videos for later download
+          // Collect videos and images for later download
           if (files.length > 0) {
             const videos = files.filter(f => f.type === 'video');
             videos.forEach((video, videoIndex) => {
@@ -313,6 +314,16 @@
                 conversationId: conversationId,
                 messageIndex: i,
                 fileIndex: videoIndex
+              });
+            });
+
+            const images = files.filter(f => f.type === 'image');
+            images.forEach((image, imageIndex) => {
+              imagesToDownload.push({
+                url: image.url,
+                conversationId: conversationId,
+                messageIndex: i,
+                fileIndex: imageIndex
               });
             });
           }
@@ -368,7 +379,8 @@
           total_count: totalCount,
           data: data
         },
-        videosToDownload: videosToDownload
+        videosToDownload: videosToDownload,
+        imagesToDownload: imagesToDownload
       };
     }
 
@@ -408,6 +420,18 @@
         if (result.videosToDownload.length > 0) {
           Utils.createNotification(`Starting download of ${result.videosToDownload.length} video(s)...`);
           await this.batchDownloadVideos(result.videosToDownload);
+          Utils.createNotification('Video downloads initiated!');
+        }
+
+        // Download images after video downloads
+        if (result.imagesToDownload.length > 0) {
+          Utils.createNotification(`Starting download of ${result.imagesToDownload.length} image(s)...`);
+          await this.batchDownloadImages(result.imagesToDownload);
+          Utils.createNotification('Image downloads initiated!');
+        }
+
+        // Final completion message
+        if (result.videosToDownload.length > 0 || result.imagesToDownload.length > 0) {
           Utils.createNotification('All downloads initiated!');
         } else {
           Utils.createNotification('Export completed!');
@@ -450,6 +474,42 @@
           }
         } catch (error) {
           console.error(`Error downloading video ${i + 1}/${videosToDownload.length}:`, error);
+        }
+      }
+    }
+
+    async batchDownloadImages(imagesToDownload) {
+      for (let i = 0; i < imagesToDownload.length; i++) {
+        const imageInfo = imagesToDownload[i];
+        try {
+          // Extract filename from URL
+          const urlParams = new URLSearchParams(new URL(imageInfo.url).search);
+          const filename = urlParams.get('filename') || null;
+
+          // Send download request to background service worker
+          const response = await chrome.runtime.sendMessage({
+            type: 'DOWNLOAD_IMAGE',
+            data: {
+              url: imageInfo.url,
+              filename: filename,
+              conversationId: imageInfo.conversationId,
+              messageIndex: imageInfo.messageIndex,
+              fileIndex: imageInfo.fileIndex
+            }
+          });
+
+          if (response.success) {
+            console.log(`Image ${i + 1}/${imagesToDownload.length} download initiated: ${filename || 'image'} (ID: ${response.downloadId})`);
+          } else {
+            console.error(`Image ${i + 1}/${imagesToDownload.length} download failed: ${response.error}`);
+          }
+
+          // Delay between downloads to avoid Chrome's multiple-download confirmation
+          if (i < imagesToDownload.length - 1) {
+            await Utils.sleep(500);
+          }
+        } catch (error) {
+          console.error(`Error downloading image ${i + 1}/${imagesToDownload.length}:`, error);
         }
       }
     }
