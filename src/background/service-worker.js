@@ -52,7 +52,7 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
     // Use chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: `gemini-videos/${finalFilename}`,
+      filename: finalFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
@@ -91,7 +91,7 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
     // Use chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: `gemini-videos/${finalFilename}`,
+      filename: finalFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
