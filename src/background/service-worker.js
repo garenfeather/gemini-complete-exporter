@@ -91,7 +91,7 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
     // Use chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: `gemini-images/${finalFilename}`,
+      filename: `gemini-videos/${finalFilename}`,
       saveAs: false,
       conflictAction: 'uniquify'
     });
