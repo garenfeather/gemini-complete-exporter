@@ -31,6 +31,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Return true to indicate async response
     return true;
   }
+
+  if (message.type === 'DOWNLOAD_GENERATED_IMAGE') {
+    handleGeneratedImageDownload(message.data)
+      .then(downloadId => {
+        sendResponse({ success: true, downloadId });
+      })
+      .catch(error => {
+        console.error('Download failed:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+
+    // Return true to indicate async response
+    return true;
+  }
 });
 
 async function handleVideoDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
@@ -97,6 +111,29 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
     });
 
     console.log(`Download started: ${finalFilename} (ID: ${downloadId})`);
+    return downloadId;
+
+  } catch (error) {
+    console.error('Error initiating download:', error);
+    throw error;
+  }
+}
+
+async function handleGeneratedImageDownload({ url, conversationId, messageIndex, fileIndex }) {
+  try {
+    // Generated images are typically PNG format
+    const ext = 'png';
+    const finalFilename = `${conversationId}_msg${messageIndex}_generated${fileIndex}.${ext}`;
+
+    // Use chrome.downloads API
+    const downloadId = await chrome.downloads.download({
+      url: url,
+      filename: finalFilename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    });
+
+    console.log(`Generated image download started: ${finalFilename} (ID: ${downloadId})`);
     return downloadId;
 
   } catch (error) {

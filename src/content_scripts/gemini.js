@@ -24,7 +24,11 @@
       VIDEO_PLAYER: 'video[data-test-id="video-player"]',
       USER_QUERY_TEXT: '.query-text',
       IMAGE_PREVIEW: 'img[data-test-id="uploaded-img"]',
-      ACTION_CARD: 'action-card'
+      ACTION_CARD: 'action-card',
+      GENERATED_IMAGE: 'generated-image',
+      GENERATED_IMAGE_IMG: 'generated-image img.image',
+      DOWNLOAD_GENERATED_IMAGE_BUTTON: 'button[data-test-id="download-generated-image-button"]',
+      MODEL_RESPONSE_TEXT: '.markdown p[data-path-to-node]'
     },
 
     TIMING: {
@@ -279,6 +283,37 @@
       return modelRespElem.querySelector(CONFIG.SELECTORS.ACTION_CARD) !== null;
     }
 
+    extractGeneratedImages(modelRespElem) {
+      const generatedImages = [];
+      if (!modelRespElem) return generatedImages;
+
+      const imageElements = modelRespElem.querySelectorAll(CONFIG.SELECTORS.GENERATED_IMAGE_IMG);
+      imageElements.forEach(img => {
+        const imageUrl = img.src;
+        if (imageUrl) {
+          generatedImages.push(imageUrl);
+        }
+      });
+
+      return generatedImages;
+    }
+
+    extractTextFromMixedResponse(modelRespElem) {
+      if (!modelRespElem) return '';
+
+      const textElements = modelRespElem.querySelectorAll(CONFIG.SELECTORS.MODEL_RESPONSE_TEXT);
+      const textParts = [];
+
+      textElements.forEach(elem => {
+        const text = elem.textContent.trim();
+        if (text) {
+          textParts.push(text);
+        }
+      });
+
+      return textParts.join('\n');
+    }
+
     async buildJSON(turns, conversationTitle, conversationId) {
       const data = [];
       const videosToDownload = [];
@@ -352,7 +387,9 @@
           await Utils.sleep(CONFIG.TIMING.MOUSEOVER_DELAY);
 
           const copyBtn = turn.querySelector(CONFIG.SELECTORS.COPY_BUTTON);
+
           if (copyBtn) {
+            // Normal text response with copy button
             const clipboardText = await this.copyModelResponse(turn, copyBtn);
 
             const assistantMessage = {
@@ -362,6 +399,39 @@
             };
 
             data.push(assistantMessage);
+          } else {
+            // Check for generated images (image generation response)
+            const generatedImages = this.extractGeneratedImages(modelRespElem);
+
+            if (generatedImages.length > 0) {
+              // Extract text content from mixed response
+              const textContent = this.extractTextFromMixedResponse(modelRespElem);
+
+              const assistantMessage = {
+                role: 'assistant',
+                content_type: 'mixed',
+                content: textContent,
+                files: []
+              };
+
+              // Collect generated images for download
+              generatedImages.forEach((imageUrl, imageIndex) => {
+                assistantMessage.files.push({
+                  type: 'image',
+                  url: imageUrl
+                });
+
+                imagesToDownload.push({
+                  url: imageUrl,
+                  conversationId: conversationId,
+                  messageIndex: i,
+                  fileIndex: imageIndex,
+                  isGenerated: true
+                });
+              });
+
+              data.push(assistantMessage);
+            }
           }
         }
       }
@@ -482,24 +552,39 @@
       for (let i = 0; i < imagesToDownload.length; i++) {
         const imageInfo = imagesToDownload[i];
         try {
-          // Extract filename from URL
-          const urlParams = new URLSearchParams(new URL(imageInfo.url).search);
-          const filename = urlParams.get('filename') || null;
+          let response;
 
-          // Send download request to background service worker
-          const response = await chrome.runtime.sendMessage({
-            type: 'DOWNLOAD_IMAGE',
-            data: {
-              url: imageInfo.url,
-              filename: filename,
-              conversationId: imageInfo.conversationId,
-              messageIndex: imageInfo.messageIndex,
-              fileIndex: imageInfo.fileIndex
-            }
-          });
+          if (imageInfo.isGenerated) {
+            // Generated image (from AI response)
+            response = await chrome.runtime.sendMessage({
+              type: 'DOWNLOAD_GENERATED_IMAGE',
+              data: {
+                url: imageInfo.url,
+                conversationId: imageInfo.conversationId,
+                messageIndex: imageInfo.messageIndex,
+                fileIndex: imageInfo.fileIndex
+              }
+            });
+          } else {
+            // Uploaded image (from user query)
+            const urlParams = new URLSearchParams(new URL(imageInfo.url).search);
+            const filename = urlParams.get('filename') || null;
+
+            response = await chrome.runtime.sendMessage({
+              type: 'DOWNLOAD_IMAGE',
+              data: {
+                url: imageInfo.url,
+                filename: filename,
+                conversationId: imageInfo.conversationId,
+                messageIndex: imageInfo.messageIndex,
+                fileIndex: imageInfo.fileIndex
+              }
+            });
+          }
 
           if (response.success) {
-            console.log(`Image ${i + 1}/${imagesToDownload.length} download initiated: ${filename || 'image'} (ID: ${response.downloadId})`);
+            const imageType = imageInfo.isGenerated ? 'generated image' : 'image';
+            console.log(`Image ${i + 1}/${imagesToDownload.length} (${imageType}) download initiated (ID: ${response.downloadId})`);
           } else {
             console.error(`Image ${i + 1}/${imagesToDownload.length} download failed: ${response.error}`);
           }
