@@ -24,7 +24,15 @@
   "content_scripts": [
     {
       "matches": ["https://gemini.google.com/*"],
-      "js": ["src/content_scripts/gemini.js"],
+      "js": [
+        "src/content_scripts/config.js",
+        "src/content_scripts/utils.js",
+        "src/content_scripts/media-export-service.js",
+        "src/content_scripts/text-export-service.js",
+        "src/content_scripts/ui-builder.js",
+        "src/content_scripts/export-controller.js",
+        "src/content_scripts/init.js"
+      ],
       "run_at": "document_idle"
     }
   ],
