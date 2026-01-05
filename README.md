@@ -6,6 +6,7 @@ Chrome 扩展，一键导出 Gemini 聊天记录为 JSON 格式，支持视频�
 
 - 一键导出完整 Gemini 对话为 JSON 格式
 - 自动提取用户上传的视频链接
+- 自动提取模型思考过程（model thoughts）
 - 智能识别内容类型（纯文本/混合内容）
 - 统计对话轮数和消息总数
 - 使用对话 ID 命名导出文件
@@ -43,7 +44,8 @@ Chrome 扩展，一键导出 Gemini 聊天记录为 JSON 格式，支持视频�
     {
       "role": "assistant",
       "content_type": "text",
-      "content": "AI 回复内容"
+      "content": "AI 回复内容",
+      "model_thoughts": "模型的思考过程（如果有）"
     }
   ]
 }
@@ -61,12 +63,15 @@ Chrome 扩展，一键导出 Gemini 聊天记录为 JSON 格式，支持视频�
 | `content_type` | string | `"text"` 或 `"mixed"` |
 | `content` | string | 消息文本内容 |
 | `videos` | array | 视频链接数组（仅在有视频时存在） |
+| `model_thoughts` | string | 模型思考过程（仅在 assistant 消息有思考内容时存在） |
 
 ### 动态字段规则
 
 - **无视频**：不包含 `videos` 字段
 - **有视频**：`content_type` 自动设为 `"mixed"`，包含 `videos` 数组
 - **纯文本**：`content_type` 为 `"text"`
+- **有模型思考**：assistant 消息包含 `model_thoughts` 字段
+- **无模型思考**：不包含 `model_thoughts` 字段
 
 ## 权限说明
 

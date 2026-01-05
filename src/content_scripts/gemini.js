@@ -24,7 +24,10 @@
       VIDEO_PLAYER: 'video[data-test-id="video-player"]',
       USER_QUERY_TEXT: '.query-text',
       IMAGE_PREVIEW: 'img[data-test-id="uploaded-img"]',
-      ACTION_CARD: 'action-card'
+      ACTION_CARD: 'action-card',
+      THOUGHTS_HEADER_BUTTON: 'button[data-test-id="thoughts-header-button"]',
+      MODEL_THOUGHTS: 'model-thoughts',
+      THOUGHTS_CONTENT: 'div[data-test-id="thoughts-content"]'
     },
 
     TIMING: {
@@ -38,7 +41,8 @@
       MAX_CLIPBOARD_ATTEMPTS: 10,
       VIDEO_LOAD_DELAY: 500,
       VIDEO_LOAD_TIMEOUT: 5000,
-      LIGHTBOX_CLOSE_DELAY: 300
+      LIGHTBOX_CLOSE_DELAY: 300,
+      THOUGHTS_EXPAND_DELAY: 300
     },
 
     STYLES: {
@@ -243,7 +247,10 @@
               const sourceElem = videoPlayer.querySelector('source');
               const videoUrl = sourceElem?.src || videoPlayer.src;
               if (videoUrl) {
-                files.push({ type: 'video', url: videoUrl });
+                // Extract filename from URL
+                const urlParams = new URLSearchParams(new URL(videoUrl).search);
+                const filename = urlParams.get('filename') || 'video.mp4';
+                files.push({ type: 'video', url: videoUrl, filename: filename });
               }
             }
 
@@ -279,8 +286,73 @@
       return modelRespElem.querySelector(CONFIG.SELECTORS.ACTION_CARD) !== null;
     }
 
-    async buildJSON(turns, conversationTitle) {
+    async extractModelThoughts(modelRespElem) {
+      if (!modelRespElem) {
+        console.log('[Thoughts] modelRespElem is null');
+        return null;
+      }
+
+      const thoughtsButton = modelRespElem.querySelector(CONFIG.SELECTORS.THOUGHTS_HEADER_BUTTON);
+      if (!thoughtsButton) {
+        console.log('[Thoughts] No thoughts button found');
+        return null;
+      }
+
+      const thoughtsContainer = modelRespElem.querySelector(CONFIG.SELECTORS.MODEL_THOUGHTS);
+      if (!thoughtsContainer) {
+        console.log('[Thoughts] No thoughts container found');
+        return null;
+      }
+
+      // Check if thoughts content is already expanded
+      let thoughtsContent = modelRespElem.querySelector(CONFIG.SELECTORS.THOUGHTS_CONTENT);
+      const wasExpanded = thoughtsContent !== null;
+      console.log('[Thoughts] wasExpanded:', wasExpanded);
+
+      // If not expanded, click button to expand
+      if (!wasExpanded) {
+        console.log('[Thoughts] Clicking to expand...');
+        thoughtsButton.click();
+        await Utils.sleep(CONFIG.TIMING.THOUGHTS_EXPAND_DELAY);
+
+        // Wait for thoughts content to appear
+        let attempts = 0;
+        while (attempts < 10 && !thoughtsContent) {
+          await Utils.sleep(200);
+          thoughtsContent = modelRespElem.querySelector(CONFIG.SELECTORS.THOUGHTS_CONTENT);
+          attempts++;
+          console.log('[Thoughts] Waiting for content... attempt:', attempts);
+        }
+
+        if (!thoughtsContent) {
+          console.log('[Thoughts] Content not found after expansion');
+          return null;
+        }
+      }
+
+      // Extract thoughts text content from p tags with line breaks
+      const paragraphs = thoughtsContent.querySelectorAll('p');
+      const thoughtsText = Array.from(paragraphs)
+        .map(p => p.textContent.trim())
+        .filter(text => text.length > 0)
+        .join('\n');
+      console.log('[Thoughts] Extracted text length:', thoughtsText.length);
+      console.log('[Thoughts] Paragraph count:', paragraphs.length);
+      console.log('[Thoughts] First 100 chars:', thoughtsText.substring(0, 100));
+
+      // Close thoughts if we expanded them (keeps UI clean)
+      if (!wasExpanded) {
+        console.log('[Thoughts] Closing thoughts...');
+        thoughtsButton.click();
+        await Utils.sleep(CONFIG.TIMING.THOUGHTS_EXPAND_DELAY);
+      }
+
+      return thoughtsText || null;
+    }
+
+    async buildJSON(turns, conversationTitle, conversationId) {
       const data = [];
+      const videosToDownload = [];
 
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
@@ -302,6 +374,20 @@
 
           // Extract files (videos and images in order)
           const files = await this.extractFiles(userQueryElem);
+
+          // Collect videos for later download
+          if (files.length > 0) {
+            const videos = files.filter(f => f.type === 'video');
+            videos.forEach((video, videoIndex) => {
+              videosToDownload.push({
+                url: video.url,
+                filename: video.filename,
+                conversationId: conversationId,
+                messageIndex: i,
+                fileIndex: videoIndex
+              });
+            });
+          }
 
           // Extract text
           const queryTextElem = userQueryElem.querySelector(CONFIG.SELECTORS.USER_QUERY_TEXT);
@@ -336,6 +422,12 @@
               content: clipboardText ? Utils.removeCitations(clipboardText) : ''
             };
 
+            // Extract model thoughts if present
+            const modelThoughts = await this.extractModelThoughts(modelRespElem);
+            if (modelThoughts) {
+              assistantMessage.model_thoughts = modelThoughts;
+            }
+
             data.push(assistantMessage);
           }
         }
@@ -348,10 +440,13 @@
       const totalCount = data.length;
 
       return {
-        title: conversationTitle,
-        round_count: roundCount,
-        total_count: totalCount,
-        data: data
+        jsonData: {
+          title: conversationTitle,
+          round_count: roundCount,
+          total_count: totalCount,
+          data: data
+        },
+        videosToDownload: videosToDownload
       };
     }
 
@@ -380,13 +475,56 @@
         const conversationTitle = this.getConversationTitle();
         const conversationId = Utils.getConversationIdFromURL();
 
-        const jsonData = await this.buildJSON(turns, conversationTitle);
-        await this.exportToFile(jsonData, conversationId);
+        // Build JSON and collect video information
+        const result = await this.buildJSON(turns, conversationTitle, conversationId);
 
-        Utils.createNotification('Export completed!');
+        // Export JSON file
+        await this.exportToFile(result.jsonData, conversationId);
+        Utils.createNotification('JSON export completed!');
+
+        // Download videos after JSON export
+        if (result.videosToDownload.length > 0) {
+          Utils.createNotification(`Starting download of ${result.videosToDownload.length} video(s)...`);
+          await this.batchDownloadVideos(result.videosToDownload);
+          Utils.createNotification('All downloads initiated!');
+        } else {
+          Utils.createNotification('Export completed!');
+        }
       } catch (error) {
         console.error('Export error:', error);
         alert(`Export failed: ${error.message}`);
+      }
+    }
+
+    async batchDownloadVideos(videosToDownload) {
+      for (let i = 0; i < videosToDownload.length; i++) {
+        const videoInfo = videosToDownload[i];
+        try {
+          // Send download request to background service worker
+          const response = await chrome.runtime.sendMessage({
+            type: 'DOWNLOAD_VIDEO',
+            data: {
+              url: videoInfo.url,
+              filename: videoInfo.filename,
+              conversationId: videoInfo.conversationId,
+              messageIndex: videoInfo.messageIndex,
+              fileIndex: videoInfo.fileIndex
+            }
+          });
+
+          if (response.success) {
+            console.log(`Video ${i + 1}/${videosToDownload.length} download initiated (ID: ${response.downloadId})`);
+          } else {
+            console.error(`Video ${i + 1}/${videosToDownload.length} download failed: ${response.error}`);
+          }
+
+          // Delay between downloads to avoid Chrome's multiple-download confirmation
+          if (i < videosToDownload.length - 1) {
+            await Utils.sleep(500);
+          }
+        } catch (error) {
+          console.error(`Error downloading video ${i + 1}/${videosToDownload.length}:`, error);
+        }
       }
     }
   }
