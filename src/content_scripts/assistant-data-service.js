@@ -189,9 +189,17 @@
 
           // 收集生成的图片以便下载
           generatedImages.forEach((imageUrl, imageIndex) => {
+            // 生成本地文件名
+            const localFilename = Utils.generateGeneratedImageFilename(
+              conversationId,
+              messageIndex,
+              imageIndex
+            );
+
             assistantMessage.files.push({
               type: 'image',
-              url: imageUrl
+              url: imageUrl,
+              localFilename: localFilename
             });
 
             imagesToDownload.push({

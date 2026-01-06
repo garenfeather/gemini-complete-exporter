@@ -36,6 +36,18 @@
       if (files.length > 0) {
         const videos = files.filter(f => f.type === 'video');
         videos.forEach((video, videoIndex) => {
+          // 生成本地文件名
+          const localFilename = Utils.generateVideoFilename(
+            video.url,
+            video.filename,
+            conversationId,
+            messageIndex,
+            videoIndex
+          );
+
+          // 在文件对象中添加本地文件名
+          video.localFilename = localFilename;
+
           videosToDownload.push({
             url: video.url,
             filename: video.filename,
@@ -47,6 +59,18 @@
 
         const images = files.filter(f => f.type === 'image');
         images.forEach((image, imageIndex) => {
+          // 生成本地文件名
+          const localFilename = Utils.generateImageFilename(
+            image.url,
+            null, // 用户上传的图片没有原始文件名
+            conversationId,
+            messageIndex,
+            imageIndex
+          );
+
+          // 在文件对象中添加本地文件名
+          image.localFilename = localFilename;
+
           imagesToDownload.push({
             url: image.url,
             conversationId: conversationId,

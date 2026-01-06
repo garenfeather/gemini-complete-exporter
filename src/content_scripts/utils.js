@@ -48,6 +48,67 @@
       // 从 URL 中提取对话 ID: gemini.google.com/app/{id}
       const urlMatch = window.location.pathname.match(/\/app\/([^\/]+)/);
       return urlMatch ? urlMatch[1] : `conversation_${Date.now()}`;
+    },
+
+    generateVideoFilename(url, filename, conversationId, messageIndex, fileIndex) {
+      // 如果已有文件名则使用，否则生成文件名
+      if (filename) {
+        return filename;
+      }
+
+      // 尝试从 URL 参数中获取文件名
+      try {
+        const urlParams = new URLSearchParams(new URL(url).search);
+        const urlFilename = urlParams.get('filename');
+        if (urlFilename) {
+          return urlFilename;
+        }
+      } catch (e) {
+        // 忽略 URL 解析错误
+      }
+
+      // 生成默认文件名
+      const ext = 'mp4';
+      return `${conversationId}_msg${messageIndex}_video${fileIndex}.${ext}`;
+    },
+
+    generateImageFilename(url, filename, conversationId, messageIndex, fileIndex) {
+      // 如果已有文件名则使用，否则生成文件名
+      if (filename) {
+        return filename;
+      }
+
+      // 尝试从 URL 参数中获取文件名
+      try {
+        const urlParams = new URLSearchParams(new URL(url).search);
+        const urlFilename = urlParams.get('filename');
+        if (urlFilename) {
+          return urlFilename;
+        }
+      } catch (e) {
+        // 忽略 URL 解析错误
+      }
+
+      // 尝试从 URL 路径中提取扩展名
+      let ext = 'jpg'; // 默认扩展名
+      try {
+        const urlPath = new URL(url).pathname;
+        const pathExt = urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+        if (pathExt) {
+          ext = pathExt[1].toLowerCase();
+        }
+      } catch (e) {
+        // 忽略 URL 解析错误
+      }
+
+      // 生成默认文件名
+      return `${conversationId}_msg${messageIndex}_image${fileIndex}.${ext}`;
+    },
+
+    generateGeneratedImageFilename(conversationId, messageIndex, fileIndex) {
+      // 生成的图片通常是 PNG 格式
+      const ext = 'png';
+      return `${conversationId}_msg${messageIndex}_generated${fileIndex}.${ext}`;
     }
   };
 
