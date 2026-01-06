@@ -110,8 +110,8 @@
               if (videoUrl) {
                 // 从 URL 中提取文件名
                 const urlParams = new URLSearchParams(new URL(videoUrl).search);
-                const filename = urlParams.get('filename') || 'video.mp4';
-                files.push({ type: 'video', url: videoUrl, filename: filename });
+                const name = urlParams.get('filename') || 'video.mp4';
+                files.push({ type: 'video', url: videoUrl, name: name });
               }
             }
 
