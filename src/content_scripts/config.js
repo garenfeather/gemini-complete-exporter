@@ -1,13 +1,13 @@
 /**
- * Gemini Chat Exporter - Configuration
- * Central configuration constants for the extension
+ * Gemini 聊天导出器 - 配置
+ * 扩展的中央配置常量
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // CONSTANTS
+  // 常量
   // ============================================================================
   window.CONFIG = {
     BUTTON_ID: 'gemini-export-btn',

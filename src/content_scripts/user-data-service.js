@@ -1,21 +1,21 @@
 /**
- * Gemini Chat Exporter - User Data Service
- * Handles extraction of user messages and attached files
+ * Gemini 聊天导出器 - 用户数据服务
+ * 处理用户消息和附加文件的提取
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // USER DATA SERVICE
+  // 用户数据服务
   // ============================================================================
   window.UserDataService = {
     /**
-     * Extract user message from query element
-     * @param {Element} userQueryElem - The user query element
-     * @param {number} messageIndex - Index of the message in conversation
-     * @param {string} conversationId - Conversation ID
-     * @returns {Object} Object containing userMessage, videosToDownload, and imagesToDownload
+     * 从查询元素中提取用户消息
+     * @param {Element} userQueryElem - 用户查询元素
+     * @param {number} messageIndex - 消息在对话中的索引
+     * @param {string} conversationId - 对话 ID
+     * @returns {Object} 包含 userMessage、videosToDownload 和 imagesToDownload 的对象
      */
     async extractUserMessage(userQueryElem, messageIndex, conversationId) {
       if (!userQueryElem) {
@@ -29,10 +29,10 @@
       const videosToDownload = [];
       const imagesToDownload = [];
 
-      // Extract files (videos and images in order)
+      // 按顺序提取文件（视频和图片）
       const files = await MediaExportService.extractFiles(userQueryElem);
 
-      // Collect videos and images for later download
+      // 收集视频和图片以便稍后下载
       if (files.length > 0) {
         const videos = files.filter(f => f.type === 'video');
         videos.forEach((video, videoIndex) => {
@@ -56,13 +56,13 @@
         });
       }
 
-      // Extract text
+      // 提取文本
       const queryTextElem = userQueryElem.querySelector(CONFIG.SELECTORS.USER_QUERY_TEXT);
       const userText = queryTextElem
         ? queryTextElem.textContent.trim()
         : userQueryElem.textContent.trim();
 
-      // Determine content type and set fields
+      // 确定内容类型并设置字段
       if (files.length > 0) {
         userMessage.content_type = 'mixed';
         userMessage.files = files;

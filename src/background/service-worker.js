@@ -1,6 +1,6 @@
 /**
- * Background Service Worker
- * Handles video downloads using chrome.downloads API
+ * 后台服务工作者
+ * 使用 chrome.downloads API 处理视频下载
  */
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -14,7 +14,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
 
-    // Return true to indicate async response
+    // 返回 true 表示异步响应
     return true;
   }
 
@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
 
-    // Return true to indicate async response
+    // 返回 true 表示异步响应
     return true;
   }
 
@@ -42,14 +42,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: false, error: error.message });
       });
 
-    // Return true to indicate async response
+    // 返回 true 表示异步响应
     return true;
   }
 });
 
 async function handleVideoDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
-    // Extract filename from URL if not provided
+    // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
     if (!finalFilename) {
       const urlParams = new URLSearchParams(new URL(url).search);
@@ -57,13 +57,13 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
       if (urlFilename) {
         finalFilename = urlFilename;
       } else {
-        // Generate filename based on metadata
-        const ext = 'mp4'; // Default extension
+        // 基于元数据生成文件名
+        const ext = 'mp4'; // 默认扩展名
         finalFilename = `${conversationId}_msg${messageIndex}_video${fileIndex}.${ext}`;
       }
     }
 
-    // Use chrome.downloads API
+    // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
       filename: finalFilename,
@@ -82,7 +82,7 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
 
 async function handleImageDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
-    // Extract filename from URL if not provided
+    // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
     if (!finalFilename) {
       const urlParams = new URLSearchParams(new URL(url).search);
@@ -90,9 +90,9 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
       if (urlFilename) {
         finalFilename = urlFilename;
       } else {
-        // Generate filename based on metadata
-        // Try to extract extension from URL
-        let ext = 'jpg'; // Default extension
+        // 基于元数据生成文件名
+        // 尝试从 URL 中提取扩展名
+        let ext = 'jpg'; // 默认扩展名
         const urlPath = new URL(url).pathname;
         const pathExt = urlPath.match(/\.(jpg|jpeg|png|gif|webp)$/i);
         if (pathExt) {
@@ -102,7 +102,7 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
       }
     }
 
-    // Use chrome.downloads API
+    // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
       filename: finalFilename,
@@ -121,11 +121,11 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
 
 async function handleGeneratedImageDownload({ url, conversationId, messageIndex, fileIndex }) {
   try {
-    // Generated images are typically PNG format
+    // 生成的图片通常是 PNG 格式
     const ext = 'png';
     const finalFilename = `${conversationId}_msg${messageIndex}_generated${fileIndex}.${ext}`;
 
-    // Use chrome.downloads API
+    // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
       filename: finalFilename,
@@ -142,7 +142,7 @@ async function handleGeneratedImageDownload({ url, conversationId, messageIndex,
   }
 }
 
-// Monitor download progress
+// 监控下载进度
 chrome.downloads.onChanged.addListener((downloadDelta) => {
   if (downloadDelta.state) {
     if (downloadDelta.state.current === 'complete') {

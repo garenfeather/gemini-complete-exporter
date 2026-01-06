@@ -1,13 +1,13 @@
 /**
- * Gemini Chat Exporter - Utility Functions
- * Common utility functions used across the extension
+ * Gemini 聊天导出器 - 工具函数
+ * 扩展中使用的通用工具函数
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // UTILITY FUNCTIONS
+  // 工具函数
   // ============================================================================
   window.Utils = {
     sleep(ms) {
@@ -45,7 +45,7 @@
     },
 
     getConversationIdFromURL() {
-      // Extract conversation ID from URL: gemini.google.com/app/{id}
+      // 从 URL 中提取对话 ID: gemini.google.com/app/{id}
       const urlMatch = window.location.pathname.match(/\/app\/([^\/]+)/);
       return urlMatch ? urlMatch[1] : `conversation_${Date.now()}`;
     }

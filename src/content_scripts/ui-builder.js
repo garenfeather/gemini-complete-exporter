@@ -1,17 +1,17 @@
 /**
- * Gemini Chat Exporter - UI Builder
- * Creates and manages UI elements for the extension
+ * Gemini 聊天导出器 - UI 构建器
+ * 为扩展创建和管理 UI 元素
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // UI BUILDER
+  // UI 构建器
   // ============================================================================
   window.UIBuilder = class UIBuilder {
     /**
-     * Create the export button element
+     * 创建导出按钮元素
      */
     static createButton() {
       const btn = document.createElement('button');

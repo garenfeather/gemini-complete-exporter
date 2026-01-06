@@ -1,23 +1,23 @@
 /**
- * Gemini Chat Exporter - Assistant Data Service
- * Handles extraction of assistant responses, thoughts, and generated content
+ * Gemini 聊天导出器 - 助手数据服务
+ * 处理助手响应、思考过程和生成内容的提取
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // ASSISTANT DATA SERVICE
+  // 助手数据服务
   // ============================================================================
   window.AssistantDataService = {
     /**
-     * Copy model response text using clipboard API
+     * 使用剪贴板 API 复制模型响应文本
      */
     async copyModelResponse(turn, copyBtn) {
       try {
         await navigator.clipboard.writeText('');
       } catch (e) {
-        // Ignore clipboard clear errors
+        // 忽略剪贴板清除错误
       }
 
       let attempts = 0;
@@ -42,7 +42,7 @@
     },
 
     /**
-     * Check if model response has action card (should skip)
+     * 检查模型响应是否包含操作卡片（应跳过）
      */
     hasActionCard(modelRespElem) {
       if (!modelRespElem) return false;
@@ -50,7 +50,7 @@
     },
 
     /**
-     * Extract model thoughts from thinking section
+     * 从思考部分提取模型思考过程
      */
     async extractModelThoughts(modelRespElem) {
       if (!modelRespElem) {
@@ -70,18 +70,18 @@
         return null;
       }
 
-      // Check if thoughts content is already expanded
+      // 检查思考内容是否已展开
       let thoughtsContent = modelRespElem.querySelector(CONFIG.SELECTORS.THOUGHTS_CONTENT);
       const wasExpanded = thoughtsContent !== null;
       console.log('[Thoughts] wasExpanded:', wasExpanded);
 
-      // If not expanded, click button to expand
+      // 如果未展开，点击按钮展开
       if (!wasExpanded) {
         console.log('[Thoughts] Clicking to expand...');
         thoughtsButton.click();
         await Utils.sleep(CONFIG.TIMING.THOUGHTS_EXPAND_DELAY);
 
-        // Wait for thoughts content to appear
+        // 等待思考内容出现
         let attempts = 0;
         while (attempts < 10 && !thoughtsContent) {
           await Utils.sleep(200);
@@ -96,7 +96,7 @@
         }
       }
 
-      // Extract thoughts text content from p tags with line breaks
+      // 从 p 标签中提取思考文本内容，使用换行符分隔
       const paragraphs = thoughtsContent.querySelectorAll('p');
       const thoughtsText = Array.from(paragraphs)
         .map(p => p.textContent.trim())
@@ -106,7 +106,7 @@
       console.log('[Thoughts] Paragraph count:', paragraphs.length);
       console.log('[Thoughts] First 100 chars:', thoughtsText.substring(0, 100));
 
-      // Close thoughts if we expanded them (keeps UI clean)
+      // 如果是我们展开的，则关闭思考部分（保持 UI 整洁）
       if (!wasExpanded) {
         console.log('[Thoughts] Closing thoughts...');
         thoughtsButton.click();
@@ -117,7 +117,7 @@
     },
 
     /**
-     * Extract text from mixed response (response with images)
+     * 从混合响应（包含图片的响应）中提取文本
      */
     extractTextFromMixedResponse(modelRespElem) {
       if (!modelRespElem) return '';
@@ -136,19 +136,19 @@
     },
 
     /**
-     * Extract assistant message from model response element
-     * @param {Element} modelRespElem - The model response element
-     * @param {Element} turn - The conversation turn element
-     * @param {number} messageIndex - Index of the message in conversation
-     * @param {string} conversationId - Conversation ID
-     * @returns {Object} Object containing assistantMessage and imagesToDownload
+     * 从模型响应元素中提取助手消息
+     * @param {Element} modelRespElem - 模型响应元素
+     * @param {Element} turn - 对话轮次元素
+     * @param {number} messageIndex - 消息在对话中的索引
+     * @param {string} conversationId - 对话 ID
+     * @returns {Object} 包含 assistantMessage 和 imagesToDownload 的对象
      */
     async extractAssistantMessage(modelRespElem, turn, messageIndex, conversationId) {
       if (!modelRespElem) {
         return { assistantMessage: null, imagesToDownload: [] };
       }
 
-      // Trigger mouseover to show copy button
+      // 触发鼠标悬停以显示复制按钮
       modelRespElem.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       await Utils.sleep(CONFIG.TIMING.MOUSEOVER_DELAY);
 
@@ -156,7 +156,7 @@
       const copyBtn = turn.querySelector(CONFIG.SELECTORS.COPY_BUTTON);
 
       if (copyBtn) {
-        // Normal text response with copy button
+        // 带复制按钮的普通文本响应
         const clipboardText = await this.copyModelResponse(turn, copyBtn);
 
         const assistantMessage = {
@@ -165,7 +165,7 @@
           content: clipboardText ? Utils.removeCitations(clipboardText) : ''
         };
 
-        // Extract model thoughts if present
+        // 提取模型思考过程（如果存在）
         const modelThoughts = await this.extractModelThoughts(modelRespElem);
         if (modelThoughts) {
           assistantMessage.model_thoughts = modelThoughts;
@@ -173,11 +173,11 @@
 
         return { assistantMessage: assistantMessage, imagesToDownload: [] };
       } else {
-        // Check for generated images (image generation response)
+        // 检查生成的图片（图片生成响应）
         const generatedImages = MediaExportService.extractGeneratedImages(modelRespElem);
 
         if (generatedImages.length > 0) {
-          // Extract text content from mixed response
+          // 从混合响应中提取文本内容
           const textContent = this.extractTextFromMixedResponse(modelRespElem);
 
           const assistantMessage = {
@@ -187,7 +187,7 @@
             files: []
           };
 
-          // Collect generated images for download
+          // 收集生成的图片以便下载
           generatedImages.forEach((imageUrl, imageIndex) => {
             assistantMessage.files.push({
               type: 'image',

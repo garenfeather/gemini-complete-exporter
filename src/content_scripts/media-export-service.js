@@ -1,17 +1,17 @@
 /**
- * Gemini Chat Exporter - Media Export Service
- * Handles extraction and downloading of images and videos
+ * Gemini 聊天导出器 - 媒体导出服务
+ * 处理图片和视频的提取和下载
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // MEDIA EXPORT SERVICE
+  // 媒体导出服务
   // ============================================================================
   window.MediaExportService = {
     /**
-     * Extract video URLs from user query element (deprecated - use extractFiles instead)
+     * 从用户查询元素中提取视频 URL（已弃用 - 请使用 extractFiles）
      */
     async extractVideoUrls(userQueryElem) {
       const videoUrls = [];
@@ -57,7 +57,7 @@
     },
 
     /**
-     * Extract image URLs from user query element (deprecated - use extractFiles instead)
+     * 从用户查询元素中提取图片 URL（已弃用 - 请使用 extractFiles）
      */
     extractImageUrls(userQueryElem) {
       const imageUrls = [];
@@ -78,7 +78,7 @@
     },
 
     /**
-     * Extract all files (videos and images) from user query in order
+     * 按顺序从用户查询中提取所有文件（视频和图片）
      */
     async extractFiles(userQueryElem) {
       const files = [];
@@ -87,11 +87,11 @@
         return files;
       }
 
-      // Get all file preview elements in order
+      // 按顺序获取所有文件预览元素
       const filePreviews = fileContainer.querySelectorAll('user-query-file-preview');
 
       for (const preview of filePreviews) {
-        // Check if it's a video
+        // 检查是否为视频
         const videoButton = preview.querySelector(CONFIG.SELECTORS.VIDEO_PREVIEW_BUTTON);
         if (videoButton) {
           try {
@@ -108,7 +108,7 @@
               const sourceElem = videoPlayer.querySelector('source');
               const videoUrl = sourceElem?.src || videoPlayer.src;
               if (videoUrl) {
-                // Extract filename from URL
+                // 从 URL 中提取文件名
                 const urlParams = new URLSearchParams(new URL(videoUrl).search);
                 const filename = urlParams.get('filename') || 'video.mp4';
                 files.push({ type: 'video', url: videoUrl, filename: filename });
@@ -124,7 +124,7 @@
           continue;
         }
 
-        // Check if it's an image
+        // 检查是否为图片
         const imageElement = preview.querySelector(CONFIG.SELECTORS.IMAGE_PREVIEW);
         if (imageElement) {
           const imageUrl = imageElement.src;
@@ -138,7 +138,7 @@
     },
 
     /**
-     * Extract generated images from model response
+     * 从模型响应中提取生成的图片
      */
     extractGeneratedImages(modelRespElem) {
       const generatedImages = [];
@@ -156,13 +156,13 @@
     },
 
     /**
-     * Batch download videos via background service worker
+     * 通过后台服务工作者批量下载视频
      */
     async batchDownloadVideos(videosToDownload) {
       for (let i = 0; i < videosToDownload.length; i++) {
         const videoInfo = videosToDownload[i];
         try {
-          // Send download request to background service worker
+          // 向后台服务工作者发送下载请求
           const response = await chrome.runtime.sendMessage({
             type: 'DOWNLOAD_VIDEO',
             data: {
@@ -180,7 +180,7 @@
             console.error(`Video ${i + 1}/${videosToDownload.length} download failed: ${response.error}`);
           }
 
-          // Delay between downloads to avoid Chrome's multiple-download confirmation
+          // 下载之间延迟以避免 Chrome 的多重下载确认
           if (i < videosToDownload.length - 1) {
             await Utils.sleep(500);
           }
@@ -191,7 +191,7 @@
     },
 
     /**
-     * Batch download images via background service worker
+     * 通过后台服务工作者批量下载图片
      */
     async batchDownloadImages(imagesToDownload) {
       for (let i = 0; i < imagesToDownload.length; i++) {
@@ -200,7 +200,7 @@
           let response;
 
           if (imageInfo.isGenerated) {
-            // Generated image (from AI response)
+            // 生成的图片（来自 AI 响应）
             response = await chrome.runtime.sendMessage({
               type: 'DOWNLOAD_GENERATED_IMAGE',
               data: {
@@ -211,7 +211,7 @@
               }
             });
           } else {
-            // Uploaded image (from user query)
+            // 上传的图片（来自用户查询）
             const urlParams = new URLSearchParams(new URL(imageInfo.url).search);
             const filename = urlParams.get('filename') || null;
 
@@ -234,7 +234,7 @@
             console.error(`Image ${i + 1}/${imagesToDownload.length} download failed: ${response.error}`);
           }
 
-          // Delay between downloads to avoid Chrome's multiple-download confirmation
+          // 下载之间延迟以避免 Chrome 的多重下载确认
           if (i < imagesToDownload.length - 1) {
             await Utils.sleep(500);
           }

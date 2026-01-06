@@ -1,13 +1,13 @@
 /**
- * Gemini Chat Exporter - Initialization
- * Entry point for the content script
+ * Gemini 聊天导出器 - 初始化
+ * 内容脚本的入口点
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // INITIALIZATION
+  // 初始化
   // ============================================================================
   const controller = new ExportController();
   controller.init();

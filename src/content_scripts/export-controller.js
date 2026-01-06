@@ -1,13 +1,13 @@
 /**
- * Gemini Chat Exporter - Export Controller
- * Coordinates UI, export orchestration, and data services
+ * Gemini 聊天导出器 - 导出控制器
+ * 协调 UI、导出编排和数据服务
  */
 
 (function() {
   'use strict';
 
   // ============================================================================
-  // EXPORT CONTROLLER
+  // 导出控制器
   // ============================================================================
   window.ExportController = class ExportController {
     constructor() {
@@ -15,7 +15,7 @@
     }
 
     /**
-     * Initialize controller - create UI and attach listeners
+     * 初始化控制器 - 创建 UI 并附加监听器
      */
     init() {
       this.createUI();
@@ -24,7 +24,7 @@
     }
 
     /**
-     * Create UI elements
+     * 创建 UI 元素
      */
     createUI() {
       this.button = UIBuilder.createButton();
@@ -32,14 +32,14 @@
     }
 
     /**
-     * Attach event listeners to UI
+     * 附加事件监听器到 UI
      */
     attachEventListeners() {
       this.button.addEventListener('click', () => this.handleButtonClick());
     }
 
     /**
-     * Handle export button click
+     * 处理导出按钮点击
      */
     async handleButtonClick() {
       this.button.disabled = true;
@@ -56,7 +56,7 @@
     }
 
     /**
-     * Observe storage changes to show/hide button
+     * 观察存储变化以显示/隐藏按钮
      */
     observeStorageChanges() {
       const updateVisibility = () => {
@@ -86,11 +86,11 @@
     }
 
     // ============================================================================
-    // EXPORT ORCHESTRATION METHODS
+    // 导出编排方法
     // ============================================================================
 
     /**
-     * Scroll to top of chat to load all messages
+     * 滚动到聊天顶部以加载所有消息
      */
     async scrollToLoadAll() {
       const scrollContainer = document.querySelector(CONFIG.SELECTORS.CHAT_CONTAINER);
@@ -123,7 +123,7 @@
     }
 
     /**
-     * Get conversation title from page
+     * 从页面获取对话标题
      */
     getConversationTitle() {
       const titleCard = document.querySelector(CONFIG.SELECTORS.CONVERSATION_TITLE);
@@ -131,8 +131,8 @@
     }
 
     /**
-     * Build JSON structure from conversation turns
-     * Orchestrates extraction of both user and assistant messages
+     * 从对话轮次构建 JSON 结构
+     * 编排用户和助手消息的提取
      */
     async buildJSON(turns, conversationTitle, conversationId) {
       const data = [];
@@ -143,14 +143,14 @@
         const turn = turns[i];
         Utils.createNotification(`Processing message ${i + 1} of ${turns.length}...`);
 
-        // Check if model response has action-card (skip if present)
+        // 检查模型响应是否包含操作卡片（如果存在则跳过）
         const modelRespElem = turn.querySelector(CONFIG.SELECTORS.MODEL_RESPONSE);
         if (AssistantDataService.hasActionCard(modelRespElem)) {
-          // Skip this turn entirely (both user query and model response)
+          // 完全跳过此轮次（用户查询和模型响应都跳过）
           continue;
         }
 
-        // Extract user message
+        // 提取用户消息
         const userQueryElem = turn.querySelector(CONFIG.SELECTORS.USER_QUERY);
         if (userQueryElem) {
           const userResult = await UserDataService.extractUserMessage(
@@ -166,7 +166,7 @@
           }
         }
 
-        // Extract assistant message
+        // 提取助手消息
         if (modelRespElem) {
           const assistantResult = await AssistantDataService.extractAssistantMessage(
             modelRespElem,
@@ -182,7 +182,7 @@
         }
       }
 
-      // Calculate round_count and total_count
+      // 计算轮次数和总数
       const userCount = data.filter(m => m.role === 'user').length;
       const assistantCount = data.filter(m => m.role === 'assistant').length;
       const roundCount = Math.min(userCount, assistantCount);
@@ -201,7 +201,7 @@
     }
 
     /**
-     * Export JSON data to file
+     * 导出 JSON 数据到文件
      */
     async exportToFile(jsonData, filename) {
       const jsonString = JSON.stringify(jsonData, null, 2);
@@ -221,8 +221,8 @@
     }
 
     /**
-     * Main export execution
-     * Orchestrates the entire export process
+     * 主导出执行
+     * 编排整个导出过程
      */
     async execute() {
       try {
@@ -232,28 +232,28 @@
         const conversationTitle = this.getConversationTitle();
         const conversationId = Utils.getConversationIdFromURL();
 
-        // Build JSON and collect media information
+        // 构建 JSON 并收集媒体信息
         const result = await this.buildJSON(turns, conversationTitle, conversationId);
 
-        // Export JSON file
+        // 导出 JSON 文件
         await this.exportToFile(result.jsonData, conversationId);
         Utils.createNotification('JSON export completed!');
 
-        // Download videos after JSON export
+        // JSON 导出后下载视频
         if (result.videosToDownload.length > 0) {
           Utils.createNotification(`Starting download of ${result.videosToDownload.length} video(s)...`);
           await MediaExportService.batchDownloadVideos(result.videosToDownload);
           Utils.createNotification('Video downloads initiated!');
         }
 
-        // Download images after video downloads
+        // 视频下载后下载图片
         if (result.imagesToDownload.length > 0) {
           Utils.createNotification(`Starting download of ${result.imagesToDownload.length} image(s)...`);
           await MediaExportService.batchDownloadImages(result.imagesToDownload);
           Utils.createNotification('Image downloads initiated!');
         }
 
-        // Final completion message
+        // 最终完成消息
         if (result.videosToDownload.length > 0 || result.imagesToDownload.length > 0) {
           Utils.createNotification('All downloads initiated!');
         } else {
