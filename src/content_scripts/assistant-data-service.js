@@ -117,6 +117,84 @@
     },
 
     /**
+     * 提取使用的模型名称
+     */
+    async extractModelName(turn) {
+      try {
+        // 查找 "更多" 菜单按钮
+        const moreMenuButton = turn.querySelector('button[data-test-id="more-menu-button"]');
+        if (!moreMenuButton) {
+          console.log('[Model] More menu button not found');
+          return null;
+        }
+
+        // 点击按钮打开菜单
+        moreMenuButton.click();
+        await Utils.sleep(300); // 等待菜单出现
+
+        // 查找包含模型信息的菜单项（带有 spark 图标）
+        const modelMenuItem = document.querySelector('div[mat-menu-item] mat-icon[fonticon="spark"]');
+        if (!modelMenuItem) {
+          console.log('[Model] Model menu item not found');
+          // 关闭菜单（点击页面其他地方）
+          document.body.click();
+          return null;
+        }
+
+        // 获取包含模型信息的父元素
+        const menuItem = modelMenuItem.closest('div[mat-menu-item]');
+        if (!menuItem) {
+          console.log('[Model] Menu item parent not found');
+          document.body.click();
+          return null;
+        }
+
+        // 提取文本内容
+        const menuItemText = menuItem.textContent.trim();
+        console.log('[Model] Menu item text:', menuItemText);
+
+        // 关闭菜单
+        document.body.click();
+        await Utils.sleep(200);
+
+        // 解析模型名称（兼容中英文）
+        // 中文格式：" 模型：3 Pro " 或 "模型：3 Pro"
+        // 英文格式：" Model: Fast " 或 "Model: Fast"
+        let modelName = null;
+
+        // 尝试匹配中文格式
+        const chineseMatch = menuItemText.match(/模型[：:]\s*(.+?)$/);
+        if (chineseMatch) {
+          modelName = chineseMatch[1].trim();
+        } else {
+          // 尝试匹配英文格式
+          const englishMatch = menuItemText.match(/Model[：:]\s*(.+?)$/i);
+          if (englishMatch) {
+            modelName = englishMatch[1].trim();
+          }
+        }
+
+        if (modelName) {
+          console.log('[Model] Extracted model name:', modelName);
+          return modelName;
+        }
+
+        console.log('[Model] Could not parse model name from text');
+        return null;
+
+      } catch (error) {
+        console.error('[Model] Error extracting model name:', error);
+        // 确保菜单被关闭
+        try {
+          document.body.click();
+        } catch (e) {
+          // 忽略关闭菜单的错误
+        }
+        return null;
+      }
+    },
+
+    /**
      * 从混合响应（包含图片的响应）中提取文本
      */
     extractTextFromMixedResponse(modelRespElem) {
@@ -171,6 +249,12 @@
           assistantMessage.model_thoughts = modelThoughts;
         }
 
+        // 提取模型名称
+        const modelName = await this.extractModelName(turn);
+        if (modelName) {
+          assistantMessage.model = modelName;
+        }
+
         return { assistantMessage: assistantMessage, imagesToDownload: [] };
       } else {
         // 检查生成的图片（图片生成响应）
@@ -210,6 +294,12 @@
               isGenerated: true
             });
           });
+
+          // 提取模型名称
+          const modelName = await this.extractModelName(turn);
+          if (modelName) {
+            assistantMessage.model = modelName;
+          }
 
           return { assistantMessage: assistantMessage, imagesToDownload: imagesToDownload };
         }
