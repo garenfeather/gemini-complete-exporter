@@ -33,7 +33,6 @@
     createUI() {
       this.buttonContainer = UIBuilder.createButton();
       this.mainBtn = this.buttonContainer._mainBtn;
-      this.singleExportOption = this.buttonContainer._singleExportOption;
       this.batchExportOption = this.buttonContainer._batchExportOption;
       document.body.appendChild(this.buttonContainer);
     }
@@ -42,10 +41,10 @@
      * 附加事件监听器到 UI
      */
     attachEventListeners() {
-      // 单个导出
-      this.singleExportOption.addEventListener('click', () => this.handleSingleExport());
+      // 主按钮点击 - 单个导出
+      this.mainBtn.addEventListener('click', () => this.handleSingleExport());
 
-      // 批量导出
+      // 批量导出选项
       this.batchExportOption.addEventListener('click', () => this.handleBatchExport());
     }
 

@@ -27,7 +27,6 @@
       // 创建主按钮
       const mainBtn = document.createElement('button');
       mainBtn.id = CONFIG.BUTTON_ID;
-      mainBtn.textContent = 'Export';
       Object.assign(mainBtn.style, {
         padding: '8px 16px',
         background: CONFIG.STYLES.BUTTON_PRIMARY,
@@ -44,7 +43,7 @@
         gap: '8px'
       });
 
-      // 添加下拉箭头
+      // 添加按钮文字和下拉箭头
       const arrow = document.createElement('span');
       arrow.textContent = '▼';
       arrow.style.fontSize = '0.7em';
@@ -60,21 +59,17 @@
         bottom: '100%',
         left: '0',
         marginBottom: '4px',
-        background: '#fff',
-        border: '1px solid #ddd',
+        background: CONFIG.STYLES.BUTTON_PRIMARY,
+        border: 'none',
         borderRadius: '6px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         minWidth: '200px',
         overflow: 'hidden'
       });
 
-      // 单个导出选项
-      const singleExportOption = this.createDropdownOption('单个导出', 'single');
-
       // 批量导出选项
       const batchExportOption = this.createDropdownOption('批量导出', 'batch');
 
-      dropdown.appendChild(singleExportOption);
       dropdown.appendChild(batchExportOption);
 
       // 鼠标悬停显示/隐藏下拉菜单
@@ -100,7 +95,6 @@
       // 保存引用以便后续使用
       container._mainBtn = mainBtn;
       container._dropdown = dropdown;
-      container._singleExportOption = singleExportOption;
       container._batchExportOption = batchExportOption;
 
       return container;
@@ -120,19 +114,17 @@
         cursor: 'pointer',
         transition: 'background 0.2s',
         fontSize: '0.95em',
-        borderBottom: '1px solid #f0f0f0'
+        color: '#fff',
+        borderBottom: 'none'
       });
 
       option.addEventListener('mouseenter', () => {
-        option.style.background = '#f5f5f5';
+        option.style.background = CONFIG.STYLES.BUTTON_HOVER;
       });
 
       option.addEventListener('mouseleave', () => {
         option.style.background = 'transparent';
       });
-
-      // 移除最后一个选项的底部边框
-      option.style.borderBottom = 'none';
 
       return option;
     }
