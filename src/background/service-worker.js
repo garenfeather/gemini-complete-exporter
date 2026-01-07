@@ -34,15 +34,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'EXPORT_COMPLETED') {
-    handleExportCompleted(message.conversationId);
-    sendResponse({ success: true });
-    return false;
+    handleExportCompleted(message.conversationId)
+      .then(() => {
+        sendResponse({ success: true });
+      })
+      .catch(error => {
+        console.error('Handle export completed failed:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
   }
 
   if (message.type === 'EXPORT_FAILED') {
-    handleExportFailed(message.conversationId, message.error);
-    sendResponse({ success: true });
-    return false;
+    handleExportFailed(message.conversationId, message.error)
+      .then(() => {
+        sendResponse({ success: true });
+      })
+      .catch(error => {
+        console.error('Handle export failed failed:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
   }
 
   // 下载相关消息
