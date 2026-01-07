@@ -176,20 +176,32 @@
           await this.execute();
 
           // 通知 background script 导出完成
+          console.log('[Auto Export] Notifying background: export completed');
           chrome.runtime.sendMessage({
             type: 'EXPORT_COMPLETED',
             conversationId: Utils.getConversationIdFromURL()
+          }, (response) => {
+            console.log('[Auto Export] Background response:', response);
           });
+
+          // 等待消息发送完成
+          await Utils.sleep(500);
 
         } catch (error) {
           console.error('[Auto Export] Export failed:', error);
 
           // 通知 background script 导出失败
+          console.log('[Auto Export] Notifying background: export failed');
           chrome.runtime.sendMessage({
             type: 'EXPORT_FAILED',
             conversationId: Utils.getConversationIdFromURL(),
             error: error.message
+          }, (response) => {
+            console.log('[Auto Export] Background response:', response);
           });
+
+          // 等待消息发送完成
+          await Utils.sleep(500);
         }
       }
     }

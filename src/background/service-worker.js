@@ -20,6 +20,8 @@ let batchExportState = {
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[Service Worker] Received message:', message.type, message);
+
   // 批量导出相关消息
   if (message.type === 'START_BATCH_EXPORT') {
     handleStartBatchExport(message.conversationIds, message.userNumber)
@@ -34,8 +36,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === 'EXPORT_COMPLETED') {
+    console.log('[Service Worker] Handling EXPORT_COMPLETED for:', message.conversationId);
     handleExportCompleted(message.conversationId)
       .then(() => {
+        console.log('[Service Worker] EXPORT_COMPLETED handled successfully');
         sendResponse({ success: true });
       })
       .catch(error => {
