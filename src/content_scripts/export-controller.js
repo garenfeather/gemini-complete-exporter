@@ -184,8 +184,8 @@
             console.log('[Auto Export] Background response:', response);
           });
 
-          // 等待消息发送完成
-          await Utils.sleep(500);
+          // 等待消息发送完成和下载稳定
+          await Utils.sleep(1500);
 
         } catch (error) {
           console.error('[Auto Export] Export failed:', error);
@@ -201,7 +201,7 @@
           });
 
           // 等待消息发送完成
-          await Utils.sleep(500);
+          await Utils.sleep(1500);
         }
       }
     }
@@ -364,6 +364,9 @@
       a.download = `${filename}.json`;
       document.body.appendChild(a);
       a.click();
+
+      // 等待下载启动（批量导出时浏览器可能延迟处理下载）
+      await Utils.sleep(2000);
 
       setTimeout(() => {
         document.body.removeChild(a);
