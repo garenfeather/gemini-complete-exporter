@@ -113,11 +113,16 @@
           // 关闭对话框
           document.body.removeChild(dialog);
 
+          // 提取当前页面的用户编号
+          const userNumber = this.getUserNumber();
+          console.log('[Batch Export] User number:', userNumber);
+
           // 发送批量导出请求到 background script
           console.log('[Batch Export] Starting batch export for IDs:', result.valid);
           chrome.runtime.sendMessage({
             type: 'START_BATCH_EXPORT',
-            conversationIds: result.valid
+            conversationIds: result.valid,
+            userNumber: userNumber
           }, (response) => {
             if (response && response.success) {
               Utils.createNotification(`已开始批量导出 ${result.valid.length} 个对话`);
@@ -143,6 +148,14 @@
         reader.onerror = (e) => reject(new Error('文件读取失败'));
         reader.readAsText(file);
       });
+    }
+
+    /**
+     * 从当前页面 URL 提取用户编号
+     */
+    getUserNumber() {
+      const match = window.location.pathname.match(/\/u\/(\d+)\//);
+      return match ? match[1] : '0';
     }
 
     /**

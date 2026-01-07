@@ -12,6 +12,7 @@ let batchExportState = {
   queue: [],
   currentIndex: 0,
   currentTabId: null,
+  userNumber: '0',
   results: {
     completed: [],
     failed: []
@@ -21,7 +22,7 @@ let batchExportState = {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 批量导出相关消息
   if (message.type === 'START_BATCH_EXPORT') {
-    handleStartBatchExport(message.conversationIds)
+    handleStartBatchExport(message.conversationIds, message.userNumber)
       .then(() => {
         sendResponse({ success: true });
       })
@@ -201,17 +202,19 @@ chrome.downloads.onChanged.addListener((downloadDelta) => {
 /**
  * 开始批量导出
  */
-async function handleStartBatchExport(conversationIds) {
+async function handleStartBatchExport(conversationIds, userNumber) {
   if (batchExportState.isRunning) {
     throw new Error('批量导出任务已在运行中');
   }
 
   console.log('[Batch Export] Starting batch export for', conversationIds.length, 'conversations');
+  console.log('[Batch Export] User number:', userNumber);
 
   // 初始化状态
   batchExportState.isRunning = true;
   batchExportState.queue = [...conversationIds];
   batchExportState.currentIndex = 0;
+  batchExportState.userNumber = userNumber || '0';
   batchExportState.results = {
     completed: [],
     failed: []
@@ -348,7 +351,8 @@ function finishBatchExport() {
  * 生成对话URL（带自动导出标记）
  */
 function generateConversationUrl(conversationId) {
-  return `https://gemini.google.com/app/${conversationId}?pageId=none&auto_export=true`;
+  const userNumber = batchExportState.userNumber || '0';
+  return `https://gemini.google.com/u/${userNumber}/app/${conversationId}?pageId=none&auto_export=true`;
 }
 
 /**

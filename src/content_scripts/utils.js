@@ -176,7 +176,11 @@
      * 生成 Gemini 对话完整 URL
      */
     generateConversationUrl(conversationId) {
-      return `https://gemini.google.com/app/${conversationId}?pageId=none`;
+      // 从当前 URL 提取用户编号（如 u/3）
+      const userMatch = window.location.pathname.match(/\/u\/(\d+)\//);
+      const userNumber = userMatch ? userMatch[1] : '0';
+
+      return `https://gemini.google.com/u/${userNumber}/app/${conversationId}?pageId=none`;
     }
   };
 
