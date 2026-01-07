@@ -11,7 +11,10 @@
   // ============================================================================
   window.ExportController = class ExportController {
     constructor() {
-      this.button = null;
+      this.buttonContainer = null;
+      this.mainBtn = null;
+      this.singleExportOption = null;
+      this.batchExportOption = null;
     }
 
     /**
@@ -21,37 +24,161 @@
       this.createUI();
       this.attachEventListeners();
       this.observeStorageChanges();
+      this.checkAutoExport();
     }
 
     /**
      * 创建 UI 元素
      */
     createUI() {
-      this.button = UIBuilder.createButton();
-      document.body.appendChild(this.button);
+      this.buttonContainer = UIBuilder.createButton();
+      this.mainBtn = this.buttonContainer._mainBtn;
+      this.singleExportOption = this.buttonContainer._singleExportOption;
+      this.batchExportOption = this.buttonContainer._batchExportOption;
+      document.body.appendChild(this.buttonContainer);
     }
 
     /**
      * 附加事件监听器到 UI
      */
     attachEventListeners() {
-      this.button.addEventListener('click', () => this.handleButtonClick());
+      // 单个导出
+      this.singleExportOption.addEventListener('click', () => this.handleSingleExport());
+
+      // 批量导出
+      this.batchExportOption.addEventListener('click', () => this.handleBatchExport());
     }
 
     /**
-     * 处理导出按钮点击
+     * 处理单个导出
      */
-    async handleButtonClick() {
-      this.button.disabled = true;
-      this.button.textContent = 'Exporting...';
+    async handleSingleExport() {
+      this.mainBtn.disabled = true;
+      const originalText = this.mainBtn.textContent;
+      this.mainBtn.textContent = 'Exporting...';
 
       try {
         await this.execute();
       } catch (error) {
         console.error('Export error:', error);
+        alert(`导出失败: ${error.message}`);
       } finally {
-        this.button.disabled = false;
-        this.button.textContent = 'Export';
+        this.mainBtn.disabled = false;
+        this.mainBtn.textContent = originalText;
+      }
+    }
+
+    /**
+     * 处理批量导出
+     */
+    async handleBatchExport() {
+      // 创建文件上传对话框
+      const dialog = UIBuilder.createFileUploadDialog();
+      document.body.appendChild(dialog);
+
+      const fileInput = dialog._fileInput;
+      const uploadButton = dialog._uploadButton;
+
+      // 处理上传按钮点击
+      uploadButton.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) {
+          alert('请先选择文件');
+          return;
+        }
+
+        try {
+          // 读取文件内容
+          const content = await this.readFileContent(file);
+
+          // 解析并验证ID
+          const result = Utils.parseBatchExportFile(content);
+
+          if (result.error) {
+            alert(`文件格式错误：${result.error}`);
+            return;
+          }
+
+          if (result.invalid.length > 0) {
+            const message = `发现 ${result.invalid.length} 个无效ID：\n${result.invalid.join('\n')}\n\n是否继续导出 ${result.valid.length} 个有效ID？`;
+            if (!confirm(message)) {
+              return;
+            }
+          }
+
+          if (result.valid.length === 0) {
+            alert('没有找到有效的对话ID');
+            return;
+          }
+
+          // 关闭对话框
+          document.body.removeChild(dialog);
+
+          // 发送批量导出请求到 background script
+          console.log('[Batch Export] Starting batch export for IDs:', result.valid);
+          chrome.runtime.sendMessage({
+            type: 'START_BATCH_EXPORT',
+            conversationIds: result.valid
+          }, (response) => {
+            if (response && response.success) {
+              Utils.createNotification(`已开始批量导出 ${result.valid.length} 个对话`);
+            } else {
+              alert(`启动批量导出失败: ${response?.error || '未知错误'}`);
+            }
+          });
+
+        } catch (error) {
+          console.error('Batch export error:', error);
+          alert(`批量导出失败: ${error.message}`);
+        }
+      });
+    }
+
+    /**
+     * 读取文件内容
+     */
+    readFileContent(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('文件读取失败'));
+        reader.readAsText(file);
+      });
+    }
+
+    /**
+     * 检查是否需要自动导出
+     */
+    async checkAutoExport() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const autoExport = urlParams.get('auto_export');
+
+      if (autoExport === 'true') {
+        console.log('[Auto Export] Detected auto export flag, starting export...');
+
+        // 等待页面完全加载
+        await Utils.sleep(2000);
+
+        try {
+          // 执行导出
+          await this.execute();
+
+          // 通知 background script 导出完成
+          chrome.runtime.sendMessage({
+            type: 'EXPORT_COMPLETED',
+            conversationId: Utils.getConversationIdFromURL()
+          });
+
+        } catch (error) {
+          console.error('[Auto Export] Export failed:', error);
+
+          // 通知 background script 导出失败
+          chrome.runtime.sendMessage({
+            type: 'EXPORT_FAILED',
+            conversationId: Utils.getConversationIdFromURL(),
+            error: error.message
+          });
+        }
       }
     }
 
