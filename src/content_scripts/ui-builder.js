@@ -21,7 +21,8 @@
         position: 'fixed',
         bottom: '24px',
         left: '180px',
-        zIndex: '9999'
+        zIndex: '9999',
+        display: 'inline-block'
       });
 
       // 创建主按钮
@@ -63,7 +64,7 @@
         border: 'none',
         borderRadius: '6px',
         boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-        minWidth: '200px',
+        width: '100%',
         overflow: 'hidden'
       });
 
