@@ -109,6 +109,78 @@
       // 生成的图片通常是 PNG 格式
       const ext = 'png';
       return `${conversationId}_msg${messageIndex}_generated${fileIndex}.${ext}`;
+    },
+
+    /**
+     * 验证对话 ID 格式
+     * Gemini 对话 ID 格式：16位十六进制字符串
+     */
+    validateConversationId(id) {
+      if (!id || typeof id !== 'string') {
+        return false;
+      }
+
+      // 去除首尾空格
+      id = id.trim();
+
+      // 检查长度和格式（16位十六进制）
+      const hexPattern = /^[a-f0-9]{16}$/i;
+      return hexPattern.test(id);
+    },
+
+    /**
+     * 解析批量导出文件内容
+     * @param {string} content - 文件内容
+     * @returns {Object} { valid: string[], invalid: string[], error: string|null }
+     */
+    parseBatchExportFile(content) {
+      const result = {
+        valid: [],
+        invalid: [],
+        error: null
+      };
+
+      if (!content || typeof content !== 'string') {
+        result.error = '文件内容为空';
+        return result;
+      }
+
+      // 按行分割
+      const lines = content.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0); // 过滤空行
+
+      if (lines.length === 0) {
+        result.error = '文件中没有有效内容';
+        return result;
+      }
+
+      if (lines.length > 5) {
+        result.error = `文件包含 ${lines.length} 个ID，超过最大限制（5个）`;
+        return result;
+      }
+
+      // 验证每个 ID
+      for (const line of lines) {
+        if (this.validateConversationId(line)) {
+          result.valid.push(line.trim());
+        } else {
+          result.invalid.push(line);
+        }
+      }
+
+      return result;
+    },
+
+    /**
+     * 生成 Gemini 对话完整 URL
+     */
+    generateConversationUrl(conversationId) {
+      // 从当前 URL 提取用户编号（如 u/3）
+      const userMatch = window.location.pathname.match(/\/u\/(\d+)\//);
+      const userNumber = userMatch ? userMatch[1] : '0';
+
+      return `https://gemini.google.com/u/${userNumber}/app/${conversationId}?pageId=none`;
     }
   };
 
