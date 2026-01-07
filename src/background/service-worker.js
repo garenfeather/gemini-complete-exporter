@@ -241,7 +241,7 @@ async function processNextExport() {
 
   try {
     // 生成URL（带自动导出标记）
-    const url = await generateConversationUrl(conversationId);
+    const url = generateConversationUrl(conversationId);
 
     // 创建新标签页
     const tab = await chrome.tabs.create({
@@ -347,19 +347,8 @@ function finishBatchExport() {
 /**
  * 生成对话URL（带自动导出标记）
  */
-async function generateConversationUrl(conversationId) {
-  // 获取当前活动标签页以提取用户编号
-  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-  let userNumber = '0';
-
-  if (tabs.length > 0 && tabs[0].url) {
-    const match = tabs[0].url.match(/\/u\/(\d+)\//);
-    if (match) {
-      userNumber = match[1];
-    }
-  }
-
-  return `https://gemini.google.com/u/${userNumber}/app/${conversationId}?pageId=none&auto_export=true`;
+function generateConversationUrl(conversationId) {
+  return `https://gemini.google.com/app/${conversationId}?pageId=none&auto_export=true`;
 }
 
 /**

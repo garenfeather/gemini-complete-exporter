@@ -190,7 +190,7 @@
         try {
           if (chrome?.storage?.sync) {
             chrome.storage.sync.get(['hideExportBtn'], (result) => {
-              this.button.style.display = result.hideExportBtn ? 'none' : '';
+              this.buttonContainer.style.display = result.hideExportBtn ? 'none' : '';
             });
           }
         } catch (e) {
