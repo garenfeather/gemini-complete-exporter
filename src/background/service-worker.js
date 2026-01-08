@@ -35,6 +35,23 @@ function sanitizeIdentifier(id) {
   return id.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 100);
 }
 
+/**
+ * 验证并清理索引值（messageIndex, fileIndex 等）
+ * @param {any} index - 原始索引值
+ * @returns {number} - 清理后的安全索引值（非负整数，最大10000）
+ */
+function sanitizeIndex(index) {
+  const parsed = parseInt(index);
+
+  // 确保是有效数字且非负
+  if (isNaN(parsed) || parsed < 0) {
+    return 0;
+  }
+
+  // 设置合理上限防止注入超大数字
+  return Math.min(parsed, 10000);
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'DOWNLOAD_VIDEO') {
     handleVideoDownload(message.data)
@@ -81,10 +98,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleVideoDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
-    // 清理标识符参数
+    // 清理和验证所有参数
     const safeConversationId = sanitizeIdentifier(conversationId);
-    const safeMessageIndex = parseInt(messageIndex) || 0;
-    const safeFileIndex = parseInt(fileIndex) || 0;
+    const safeMessageIndex = sanitizeIndex(messageIndex);
+    const safeFileIndex = sanitizeIndex(fileIndex);
 
     // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
@@ -125,10 +142,10 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
 
 async function handleImageDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
-    // 清理标识符参数
+    // 清理和验证所有参数
     const safeConversationId = sanitizeIdentifier(conversationId);
-    const safeMessageIndex = parseInt(messageIndex) || 0;
-    const safeFileIndex = parseInt(fileIndex) || 0;
+    const safeMessageIndex = sanitizeIndex(messageIndex);
+    const safeFileIndex = sanitizeIndex(fileIndex);
 
     // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
@@ -176,10 +193,10 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
 
 async function handleGeneratedImageDownload({ url, conversationId, messageIndex, fileIndex }) {
   try {
-    // 清理标识符参数
+    // 清理和验证所有参数
     const safeConversationId = sanitizeIdentifier(conversationId);
-    const safeMessageIndex = parseInt(messageIndex) || 0;
-    const safeFileIndex = parseInt(fileIndex) || 0;
+    const safeMessageIndex = sanitizeIndex(messageIndex);
+    const safeFileIndex = sanitizeIndex(fileIndex);
 
     // 生成的图片通常是 PNG 格式
     const ext = 'png';
