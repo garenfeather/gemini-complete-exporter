@@ -311,9 +311,10 @@ async function processNextExport() {
     const url = generateConversationUrl(conversationId);
 
     // 创建新标签页
+    // 注意：必须 active: true，否则后台标签页的剪贴板 API 和视频加载会失败
     const tab = await chrome.tabs.create({
       url: url,
-      active: false  // 在后台打开
+      active: true  // 激活标签页，确保剪贴板和视频能正常工作
     });
 
     batchExportState.currentTabId = tab.id;
