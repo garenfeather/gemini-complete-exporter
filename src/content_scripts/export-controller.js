@@ -420,7 +420,15 @@
         }
       } catch (error) {
         console.error('Export error:', error);
-        alert(`Export failed: ${error.message}`);
+        // 在自动导出模式下，不显示 alert（标签页在后台）
+        // 在手动导出模式下才显示 alert
+        const urlParams = new URLSearchParams(window.location.search);
+        const autoExport = urlParams.get('auto_export');
+        if (autoExport !== 'true') {
+          alert(`Export failed: ${error.message}`);
+        }
+        // 重新抛出异常，让 checkAutoExport 能够捕获
+        throw error;
       }
     }
   };
