@@ -141,7 +141,7 @@
       };
 
       if (!content || typeof content !== 'string') {
-        result.error = '文件内容为空';
+        result.error = 'File content is empty';
         return result;
       }
 
@@ -151,12 +151,12 @@
         .filter(line => line.length > 0); // 过滤空行
 
       if (lines.length === 0) {
-        result.error = '文件中没有有效内容';
+        result.error = 'No valid content in file';
         return result;
       }
 
       if (lines.length > 5) {
-        result.error = `文件包含 ${lines.length} 个ID，超过最大限制（5个）`;
+        result.error = `File contains ${lines.length} IDs, exceeds maximum limit (5)`;
         return result;
       }
 

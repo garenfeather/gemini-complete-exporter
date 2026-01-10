@@ -268,7 +268,7 @@ chrome.downloads.onChanged.addListener((downloadDelta) => {
  */
 async function handleStartBatchExport(conversationIds, userNumber) {
   if (batchExportState.isRunning) {
-    throw new Error('批量导出任务已在运行中');
+    throw new Error('Batch export is already running');
   }
 
   console.log('[Batch Export] Starting batch export for', conversationIds.length, 'conversations');

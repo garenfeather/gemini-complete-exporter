@@ -59,8 +59,8 @@
       try {
         await this.execute();
       } catch (error) {
-        console.error('Export error:', error);
-        alert(`导出失败: ${error.message}`);
+        console.error('[Export] Single export failed:', error.message);
+        Utils.createNotification('Export failed. Check console for details.');
       } finally {
         this.mainBtn.disabled = false;
         this.mainBtn.textContent = originalText;
@@ -82,7 +82,8 @@
       uploadButton.addEventListener('click', async () => {
         const file = fileInput.files[0];
         if (!file) {
-          alert('请先选择文件');
+          console.error('[Batch Export] No file selected');
+          Utils.createNotification('Please select a file first.');
           return;
         }
 
@@ -94,19 +95,22 @@
           const result = Utils.parseBatchExportFile(content);
 
           if (result.error) {
-            alert(`文件格式错误：${result.error}`);
+            console.error('[Batch Export] File format error:', result.error);
+            Utils.createNotification('File format error. Check console for details.');
             return;
           }
 
           if (result.invalid.length > 0) {
-            const message = `发现 ${result.invalid.length} 个无效ID：\n${result.invalid.join('\n')}\n\n是否继续导出 ${result.valid.length} 个有效ID？`;
+            console.warn('[Batch Export] Found invalid IDs:', result.invalid);
+            const message = `Found ${result.invalid.length} invalid ID(s):\n${result.invalid.join('\n')}\n\nContinue exporting ${result.valid.length} valid ID(s)?`;
             if (!confirm(message)) {
               return;
             }
           }
 
           if (result.valid.length === 0) {
-            alert('没有找到有效的对话ID');
+            console.error('[Batch Export] No valid conversation IDs found');
+            Utils.createNotification('No valid conversation IDs found.');
             return;
           }
 
@@ -125,15 +129,16 @@
             userNumber: userNumber
           }, (response) => {
             if (response && response.success) {
-              Utils.createNotification(`已开始批量导出 ${result.valid.length} 个对话`);
+              Utils.createNotification(`Started batch export for ${result.valid.length} conversation(s)`);
             } else {
-              alert(`启动批量导出失败: ${response?.error || '未知错误'}`);
+              console.error('[Batch Export] Failed to start:', response?.error || 'Unknown error');
+              Utils.createNotification('Failed to start batch export. Check console.');
             }
           });
 
         } catch (error) {
-          console.error('Batch export error:', error);
-          alert(`批量导出失败: ${error.message}`);
+          console.error('[Batch Export] Error:', error.message);
+          Utils.createNotification('Batch export failed. Check console for details.');
         }
       });
     }
@@ -145,7 +150,7 @@
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
-        reader.onerror = (e) => reject(new Error('文件读取失败'));
+        reader.onerror = (e) => reject(new Error('Failed to read file'));
         reader.readAsText(file);
       });
     }
@@ -419,15 +424,8 @@
           Utils.createNotification('Export completed!');
         }
       } catch (error) {
-        console.error('Export error:', error);
-        // 在自动导出模式下，不显示 alert（标签页在后台）
-        // 在手动导出模式下才显示 alert
-        const urlParams = new URLSearchParams(window.location.search);
-        const autoExport = urlParams.get('auto_export');
-        if (autoExport !== 'true') {
-          alert(`Export failed: ${error.message}`);
-        }
-        // 重新抛出异常，让 checkAutoExport 能够捕获
+        console.error('[Export] Export failed:', error.message);
+        // Re-throw to let checkAutoExport catch it
         throw error;
       }
     }
