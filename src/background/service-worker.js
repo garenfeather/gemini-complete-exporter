@@ -12,11 +12,13 @@ let batchExportState = {
   queue: [],
   currentIndex: 0,
   currentTabId: null,
+  currentConversationId: null,
   userNumber: '0',
   results: {
     completed: [],
     failed: []
-  }
+  },
+  downloadTracker: new Map() // conversationId -> Set of download IDs
 };
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -103,6 +105,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // 返回 true 表示异步响应
     return true;
   }
+
+  if (message.type === 'DOWNLOAD_JSON') {
+    handleJsonDownload(message.data)
+      .then(downloadId => {
+        sendResponse({ success: true, downloadId });
+      })
+      .catch(error => {
+        console.error('Download failed:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+
+    // 返回 true 表示异步响应
+    return true;
+  }
 });
 
 async function handleVideoDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
@@ -130,6 +146,10 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
     });
 
     console.log(`Download started: ${finalFilename} (ID: ${downloadId})`);
+
+    // 注册下载到追踪器
+    registerDownload(conversationId, downloadId);
+
     return downloadId;
 
   } catch (error) {
@@ -169,6 +189,10 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
     });
 
     console.log(`Download started: ${finalFilename} (ID: ${downloadId})`);
+
+    // 注册下载到追踪器
+    registerDownload(conversationId, downloadId);
+
     return downloadId;
 
   } catch (error) {
@@ -192,12 +216,130 @@ async function handleGeneratedImageDownload({ url, conversationId, messageIndex,
     });
 
     console.log(`Generated image download started: ${finalFilename} (ID: ${downloadId})`);
+
+    // 注册下载到追踪器
+    registerDownload(conversationId, downloadId);
+
     return downloadId;
 
   } catch (error) {
     console.error('Error initiating download:', error);
     throw error;
   }
+}
+
+async function handleJsonDownload({ jsonData, conversationId }) {
+  try {
+    const filename = `${conversationId}.json`;
+
+    // 将 JSON 对象转换为字符串
+    const jsonString = JSON.stringify(jsonData, null, 2);
+
+    // 创建 Blob 并转换为 Data URL
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const reader = new FileReader();
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+
+    // 使用 chrome.downloads API 下载 Data URL
+    const downloadId = await chrome.downloads.download({
+      url: dataUrl,
+      filename: filename,
+      saveAs: false,
+      conflictAction: 'uniquify'
+    });
+
+    console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
+
+    // 注册下载到追踪器
+    registerDownload(conversationId, downloadId);
+
+    return downloadId;
+
+  } catch (error) {
+    console.error('Error initiating JSON download:', error);
+    throw error;
+  }
+}
+
+/**
+ * 注册下载 ID 到对话追踪器
+ */
+function registerDownload(conversationId, downloadId) {
+  if (!conversationId) {
+    console.warn('No conversationId provided for download tracking');
+    return;
+  }
+
+  if (!batchExportState.downloadTracker.has(conversationId)) {
+    batchExportState.downloadTracker.set(conversationId, new Set());
+  }
+
+  batchExportState.downloadTracker.get(conversationId).add(downloadId);
+  console.log(`[Download Tracker] Registered download ${downloadId} for conversation ${conversationId}`);
+}
+
+/**
+ * 检查对话的所有下载是否已完成或开始
+ */
+async function waitForDownloadsToStart(conversationId, timeoutMs = 10000) {
+  const downloadIds = batchExportState.downloadTracker.get(conversationId);
+
+  if (!downloadIds || downloadIds.size === 0) {
+    console.log(`[Download Tracker] No downloads to track for ${conversationId}`);
+    return true;
+  }
+
+  console.log(`[Download Tracker] Waiting for ${downloadIds.size} download(s) to start for ${conversationId}...`);
+
+  const startTime = Date.now();
+  const checkInterval = 200; // 每 200ms 检查一次
+
+  while (Date.now() - startTime < timeoutMs) {
+    let allStarted = true;
+
+    for (const downloadId of downloadIds) {
+      try {
+        const downloads = await chrome.downloads.search({ id: downloadId });
+
+        if (downloads.length === 0) {
+          // 下载还未在系统中注册
+          allStarted = false;
+          break;
+        }
+
+        const download = downloads[0];
+        // 检查下载是否已开始（不再是初始状态）
+        if (download.state === 'in_progress' || download.state === 'complete') {
+          continue; // 这个下载OK
+        } else if (download.state === 'interrupted') {
+          console.warn(`[Download Tracker] Download ${downloadId} interrupted`);
+          continue; // 即使中断也认为已处理
+        } else {
+          allStarted = false;
+          break;
+        }
+      } catch (error) {
+        console.error(`[Download Tracker] Error checking download ${downloadId}:`, error);
+        allStarted = false;
+        break;
+      }
+    }
+
+    if (allStarted) {
+      console.log(`[Download Tracker] All downloads started for ${conversationId}`);
+      return true;
+    }
+
+    await sleep(checkInterval);
+  }
+
+  console.warn(`[Download Tracker] Timeout waiting for downloads to start for ${conversationId}`);
+  return false;
 }
 
 // 监控下载进度
@@ -259,6 +401,12 @@ async function processNextExport() {
   console.log(`[Batch Export] Processing ${batchExportState.currentIndex + 1}/${batchExportState.queue.length}: ${conversationId}`);
 
   try {
+    // 设置当前对话 ID
+    batchExportState.currentConversationId = conversationId;
+
+    // 初始化下载追踪器
+    batchExportState.downloadTracker.set(conversationId, new Set());
+
     // 生成URL（带自动导出标记）
     const url = generateConversationUrl(conversationId);
 
@@ -292,6 +440,14 @@ async function processNextExport() {
 async function handleExportCompleted(conversationId) {
   console.log(`[Batch Export] Export completed for ${conversationId}`);
 
+  // 等待所有下载开始（最多 15 秒）
+  console.log(`[Batch Export] Waiting for downloads to start for ${conversationId}...`);
+  await waitForDownloadsToStart(conversationId, 15000);
+
+  // 额外等待确保下载稳定
+  console.log(`[Batch Export] Additional wait to ensure downloads are stable...`);
+  await sleep(3000);
+
   batchExportState.results.completed.push(conversationId);
 
   // 关闭当前标签页
@@ -304,6 +460,9 @@ async function handleExportCompleted(conversationId) {
     }
     batchExportState.currentTabId = null;
   }
+
+  // 清理下载追踪器
+  batchExportState.downloadTracker.delete(conversationId);
 
   // 等待一段时间后继续下一个（避免请求过快）
   await sleep(2000);

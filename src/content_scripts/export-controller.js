@@ -184,8 +184,8 @@
             console.log('[Auto Export] Background response:', response);
           });
 
-          // 等待消息发送完成和下载稳定
-          await Utils.sleep(1500);
+          // background script 会等待下载完成，这里只需短暂等待消息发送
+          await Utils.sleep(500);
 
         } catch (error) {
           console.error('[Auto Export] Export failed:', error);
@@ -201,7 +201,7 @@
           });
 
           // 等待消息发送完成
-          await Utils.sleep(1500);
+          await Utils.sleep(500);
         }
       }
     }
@@ -355,23 +355,28 @@
      * 导出 JSON 数据到文件
      */
     async exportToFile(jsonData, filename) {
-      const jsonString = JSON.stringify(jsonData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      try {
+        // 使用 background script 的 chrome.downloads API 下载 JSON
+        const response = await chrome.runtime.sendMessage({
+          type: 'DOWNLOAD_JSON',
+          data: {
+            jsonData: jsonData,
+            conversationId: filename
+          }
+        });
 
-      a.href = url;
-      a.download = `${filename}.json`;
-      document.body.appendChild(a);
-      a.click();
-
-      // 等待下载启动（批量导出时浏览器可能延迟处理下载）
-      await Utils.sleep(2000);
-
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 1000);
+        if (response.success) {
+          console.log(`JSON download initiated (ID: ${response.downloadId})`);
+          // 等待下载真正开始
+          await Utils.sleep(1000);
+          return response.downloadId;
+        } else {
+          throw new Error(response.error || 'JSON download failed');
+        }
+      } catch (error) {
+        console.error('Error exporting JSON:', error);
+        throw error;
+      }
     }
 
     /**
