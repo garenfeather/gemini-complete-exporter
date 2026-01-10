@@ -136,8 +136,8 @@
         const modelMenuItem = document.querySelector('div[mat-menu-item] mat-icon[fonticon="spark"]');
         if (!modelMenuItem) {
           console.log('[Model] Model menu item not found');
-          // 关闭菜单（点击页面其他地方）
-          document.body.click();
+          // 关闭菜单
+          this.closeMenu();
           return null;
         }
 
@@ -145,7 +145,7 @@
         const menuItem = modelMenuItem.closest('div[mat-menu-item]');
         if (!menuItem) {
           console.log('[Model] Menu item parent not found');
-          document.body.click();
+          this.closeMenu();
           return null;
         }
 
@@ -154,7 +154,7 @@
         console.log('[Model] Menu item text:', menuItemText);
 
         // 关闭菜单
-        document.body.click();
+        this.closeMenu();
         await Utils.sleep(200);
 
         // 解析模型名称（兼容中英文）
@@ -185,12 +185,37 @@
       } catch (error) {
         console.error('[Model] Error extracting model name:', error);
         // 确保菜单被关闭
-        try {
-          document.body.click();
-        } catch (e) {
-          // 忽略关闭菜单的错误
-        }
+        this.closeMenu();
         return null;
+      }
+    },
+
+    /**
+     * 关闭弹出菜单
+     */
+    closeMenu() {
+      try {
+        // 方法1：按 ESC 键关闭菜单（最可靠）
+        document.dispatchEvent(new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+          cancelable: true
+        }));
+
+        // 方法2：点击页面空白处作为备选
+        setTimeout(() => {
+          const chatContainer = document.querySelector(CONFIG.SELECTORS.CHAT_CONTAINER);
+          if (chatContainer) {
+            chatContainer.click();
+          } else {
+            document.body.click();
+          }
+        }, 50);
+      } catch (e) {
+        console.error('[Model] Error closing menu:', e);
       }
     },
 
