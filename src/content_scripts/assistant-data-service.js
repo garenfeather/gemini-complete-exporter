@@ -153,8 +153,8 @@
         const menuItemText = menuItem.textContent.trim();
         console.log('[Model] Menu item text:', menuItemText);
 
-        // 关闭菜单
-        this.closeMenu();
+        // 关闭菜单（传递按钮引用以便再次点击关闭）
+        this.closeMenu(moreMenuButton);
         await Utils.sleep(200);
 
         // 解析模型名称（兼容中英文）
@@ -192,26 +192,57 @@
 
     /**
      * 关闭弹出菜单
+     * @param {Element} menuButton - 可选的菜单按钮，如果提供则优先点击按钮关闭
      */
-    closeMenu() {
+    closeMenu(menuButton = null) {
       try {
-        // 方法1：按 ESC 键关闭菜单（最可靠）
+        // 方法1：再次点击菜单按钮关闭（最简单最可靠）
+        if (menuButton) {
+          console.log('[Model] Clicking menu button to close');
+          menuButton.click();
+          return;
+        }
+
+        // 方法2：查找并点击 Material UI 的 backdrop（背景遮罩）
+        const backdrop = document.querySelector('.cdk-overlay-backdrop');
+        if (backdrop) {
+          console.log('[Model] Clicking backdrop to close menu');
+          backdrop.click();
+          return;
+        }
+
+        // 方法3：查找菜单容器外的区域并点击
+        const menuPanel = document.querySelector('.mat-mdc-menu-panel');
+        if (menuPanel) {
+          console.log('[Model] Menu panel found, clicking outside');
+          // 点击菜单外的位置
+          const rect = menuPanel.getBoundingClientRect();
+          const outsideElement = document.elementFromPoint(
+            rect.left - 10,
+            rect.top
+          );
+          if (outsideElement) {
+            outsideElement.click();
+            return;
+          }
+        }
+
+        // 方法4：发送 ESC 键事件
+        console.log('[Model] Sending ESC key event');
         document.dispatchEvent(new KeyboardEvent('keydown', {
           key: 'Escape',
           code: 'Escape',
           keyCode: 27,
-          which: 27,
           bubbles: true,
           cancelable: true
         }));
 
-        // 方法2：点击页面空白处作为备选
+        // 方法5：点击聊天容器作为最后的备选
         setTimeout(() => {
           const chatContainer = document.querySelector(CONFIG.SELECTORS.CHAT_CONTAINER);
           if (chatContainer) {
+            console.log('[Model] Clicking chat container');
             chatContainer.click();
-          } else {
-            document.body.click();
           }
         }, 50);
       } catch (e) {
