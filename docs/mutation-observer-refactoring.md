@@ -19,9 +19,10 @@
 
 ### 改造策略
 
-1. **优先使用 MutationObserver** 监听元素出现/变化
-2. **保留超时兜底** 防止无限等待
-3. **组合策略** Observer 检测 + 短延时确认稳定
+1. **优先用于“短生命周期等待”**：用 MutationObserver 等待元素出现/消失/稳定，达成目标后立刻 `disconnect()`，避免常驻监听
+2. **监听范围尽量小**：优先监听特定容器（如聊天容器/overlay 容器），避免对 `document.body` 使用 `subtree: true` 这种全局高频监听
+3. **保留超时兜底** 防止无限等待
+4. **组合策略** Observer 检测 + 短延时确认稳定
 
 ---
 
@@ -426,7 +427,16 @@ MENU_TIMEOUT: 2000,        // 菜单操作超时
 ELEMENT_TIMEOUT: 3000      // 通用元素等待超时
 ```
 
-### 4. 调试支持
+### 4. 反模式提醒
+
+避免将 MutationObserver 用作“常驻的全局信号源”来驱动业务逻辑或高开销操作，典型反例如下：
+
+- 监听 `document.body` 且开启 `subtree: true`，并在回调中频繁执行 `chrome.storage.*.get()`、重排/重绘、网络请求等
+- 用 DOM 抖动来触发“设置同步”（设置变化的正确触发源应是 `chrome.storage.onChanged`）
+
+已知收益明确的修正示例：按钮显隐同步不再依赖 DOM 变化，见 `docs/remove-body-mutationobserver.md`。
+
+### 5. 调试支持
 
 添加调试日志以便排查问题：
 
@@ -441,6 +451,7 @@ if (CONFIG.DEBUG) {
 
 ## 改造清单
 
+- [x] 避免常驻全局 observer 驱动业务逻辑（已完成：移除按钮显隐的 body observer，见 `docs/remove-body-mutationobserver.md`）
 - [ ] 创建 `utils-observer.js` 封装通用等待函数
 - [ ] 改造 `export-controller.js` 中的 3 处延时
 - [ ] 改造 `assistant-data-service.js` 中的 7 处延时
