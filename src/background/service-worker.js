@@ -19,6 +19,19 @@ let batchExportState = {
   }
 };
 
+// 记录 JSON 下载使用的 object URL，下载结束后释放
+const objectUrlsByDownloadId = new Map();
+
+function revokeObjectUrlForDownload(downloadId) {
+  const objectUrl = objectUrlsByDownloadId.get(downloadId);
+  if (!objectUrl) return;
+  try {
+    URL.revokeObjectURL(objectUrl);
+  } finally {
+    objectUrlsByDownloadId.delete(downloadId);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('[Service Worker] Received message:', message.type, message);
 
@@ -215,33 +228,56 @@ async function handleGeneratedImageDownload({ url, conversationId, messageIndex,
 }
 
 async function handleJsonDownload({ jsonData, conversationId }) {
+  const filename = `${conversationId}.json`;
+
   try {
-    const filename = `${conversationId}.json`;
-
-    // 将 JSON 对象转换为字符串
     const jsonString = JSON.stringify(jsonData, null, 2);
-
-    // 创建 Blob 并转换为 Data URL
     const blob = new Blob([jsonString], { type: 'application/json' });
-    const reader = new FileReader();
 
-    const dataUrl = await new Promise((resolve, reject) => {
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    let objectUrl;
 
-    // 使用 chrome.downloads API 下载 Data URL
-    const downloadId = await chrome.downloads.download({
-      url: dataUrl,
-      filename: filename,
-      saveAs: false,
-      conflictAction: 'uniquify'
-    });
+    try {
+      objectUrl = URL.createObjectURL(blob);
 
-    console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
-    return downloadId;
+      const downloadId = await chrome.downloads.download({
+        url: objectUrl,
+        filename: filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      });
 
+      objectUrlsByDownloadId.set(downloadId, objectUrl);
+      console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
+      return downloadId;
+    } catch (error) {
+      if (objectUrl) {
+        try {
+          URL.revokeObjectURL(objectUrl);
+        } catch (_) {
+          // 忽略 revoke 失败
+        }
+      }
+
+      // 兼容兜底：若 object URL 在此环境不可用，则退回 Data URL
+      console.warn('[JSON Download] Falling back to Data URL:', error);
+
+      const reader = new FileReader();
+      const dataUrl = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      const downloadId = await chrome.downloads.download({
+        url: dataUrl,
+        filename: filename,
+        saveAs: false,
+        conflictAction: 'uniquify'
+      });
+
+      console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
+      return downloadId;
+    }
   } catch (error) {
     console.error('Error initiating JSON download:', error);
     throw error;
@@ -250,12 +286,14 @@ async function handleJsonDownload({ jsonData, conversationId }) {
 
 // 监控下载进度
 chrome.downloads.onChanged.addListener((downloadDelta) => {
-  if (downloadDelta.state) {
-    if (downloadDelta.state.current === 'complete') {
-      console.log(`Download completed: ${downloadDelta.id}`);
-    } else if (downloadDelta.state.current === 'interrupted') {
-      console.error(`Download interrupted: ${downloadDelta.id}`);
-    }
+  if (!downloadDelta.state) return;
+
+  if (downloadDelta.state.current === 'complete') {
+    console.log(`Download completed: ${downloadDelta.id}`);
+    revokeObjectUrlForDownload(downloadDelta.id);
+  } else if (downloadDelta.state.current === 'interrupted') {
+    console.error(`Download interrupted: ${downloadDelta.id}`);
+    revokeObjectUrlForDownload(downloadDelta.id);
   }
 });
 
