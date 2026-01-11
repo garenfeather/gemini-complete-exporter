@@ -229,9 +229,6 @@
 
       updateVisibility();
 
-      const observer = new MutationObserver(updateVisibility);
-      observer.observe(document.body, { childList: true, subtree: true });
-
       if (chrome?.storage?.onChanged) {
         chrome.storage.onChanged.addListener((changes, area) => {
           if (area === 'sync' && 'hideExportBtn' in changes) {
