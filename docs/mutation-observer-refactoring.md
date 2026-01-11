@@ -41,18 +41,17 @@
 - **触发条件**: 目标元素已存在于 DOM 中
 - **超时设置**: 10000ms
 
-#### 1.2 滚动加载等待
-- **位置**: `scrollToLoadAll()` 第 260 行
-- **当前代码**: `await Utils.sleep(CONFIG.TIMING.SCROLL_DELAY)` (2000ms)
-- **问题**: 滚动后固定等待，网络慢时内容未加载完
-- **改造方式**:
-  - 监听 `CONFIG.SELECTORS.CONVERSATION_TURN` 的 `childList` 变化
-  - 检测新消息元素的添加
-  - 检测滚动容器内容高度变化稳定
-- **触发条件**:
-  - 新的对话轮次被添加到 DOM
-  - 或 500ms 内无新元素添加（表示加载完成）
-- **超时设置**: 5000ms
+#### 1.2 滚动加载等待（已完成）
+- **位置**: `scrollToLoadAll()`
+- **修复前问题**: 依赖固定 `sleep`，快网浪费时间、慢网易漏加载；并且每轮循环会全局 `document.querySelectorAll` 统计 turn 数
+- **落地方式**:
+  - 使用短生命周期 `MutationObserver` 监听聊天容器（`CHAT_CONTAINER`）的子树变化
+  - **新 turn 出现立即返回**（fast path）
+  - 否则等待 DOM 在 `stableTime` 窗口内无变化后返回（收尾路径）并带 `timeout` 兜底
+  - turn 计数收窄到 `scrollContainer.querySelectorAll(...)`（避免全局扫描）
+- **优化参考**:
+  - `src/content_scripts/export-controller.js:248`
+  - `src/content_scripts/utils.js:94`（`Utils.waitForNewTurnsOrStable`）
 
 #### 1.3 下载开始等待
 - **位置**: `exportToFile()` 第 371 行
@@ -339,41 +338,17 @@ function waitForStableDOM(element, options = {})
 
 ## 改造示例
 
-### 示例：改造 scrollToLoadAll
+### 示例：改造 scrollToLoadAll（已完成）
 
-**改造前**:
-```javascript
-async scrollToLoadAll() {
-  const scrollContainer = document.querySelector(CONFIG.SELECTORS.CHAT_CONTAINER);
-  // ...
-  while (stableScrolls < CONFIG.TIMING.MAX_STABLE_SCROLLS) {
-    scrollContainer.scrollTop = 0;
-    await Utils.sleep(CONFIG.TIMING.SCROLL_DELAY);  // 固定等待 2000ms
-    // 检查是否有新元素...
-  }
-}
-```
+参考实现见源文件：
 
-**改造后**:
-```javascript
-async scrollToLoadAll() {
-  const scrollContainer = document.querySelector(CONFIG.SELECTORS.CHAT_CONTAINER);
-  // ...
-  while (stableScrolls < CONFIG.TIMING.MAX_STABLE_SCROLLS) {
-    const currentCount = document.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN).length;
-    scrollContainer.scrollTop = 0;
+- `src/content_scripts/export-controller.js:248`
+- `src/content_scripts/utils.js:94`
 
-    // 等待 DOM 稳定或新元素出现
-    await Utils.waitForStableDOM(scrollContainer, {
-      stableTime: 500,   // 500ms 无变化视为稳定
-      timeout: 5000      // 最长等待 5 秒
-    });
+关键点：
 
-    const newCount = document.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN).length;
-    // 检查是否有新元素...
-  }
-}
-```
+- 不再使用固定 `sleep`；改为短生命周期 observer 等待“新增 turn”或“DOM 稳定窗口”
+- turn 计数收窄到聊天容器，避免全局 `document.querySelectorAll`
 
 ### 示例：改造 extractModelName 菜单等待
 
@@ -422,7 +397,7 @@ observer.disconnect();
 
 ```javascript
 // 在 CONFIG.TIMING 中保留原有配置作为默认超时值
-SCROLL_TIMEOUT: 5000,      // 原 SCROLL_DELAY 的兜底
+SCROLL_TIMEOUT: 5000,      // 滚动加载等待超时兜底（事件驱动等待的 timeout）
 MENU_TIMEOUT: 2000,        // 菜单操作超时
 ELEMENT_TIMEOUT: 3000      // 通用元素等待超时
 ```
@@ -453,7 +428,8 @@ if (CONFIG.DEBUG) {
 
 - [x] 避免常驻全局 observer 驱动业务逻辑（已完成：移除按钮显隐的 body observer，见 `docs/remove-body-mutationobserver.md`）
 - [ ] 创建 `utils-observer.js` 封装通用等待函数
-- [ ] 改造 `export-controller.js` 中的 3 处延时
+- [x] 1.2 `scrollToLoadAll`：滚动加载等待（已完成：见 `src/content_scripts/export-controller.js:248` / `src/content_scripts/utils.js:94`）
+- [ ] 改造 `export-controller.js` 中的其余延时（1.1/1.3）
 - [ ] 改造 `assistant-data-service.js` 中的 7 处延时
 - [ ] 改造 `media-export-service.js` 中的 6 处延时
 - [ ] 删除已弃用的 `extractVideoUrls` 和 `extractImageUrls` 方法
