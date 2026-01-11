@@ -257,14 +257,21 @@
 
       while (stableScrolls < CONFIG.TIMING.MAX_STABLE_SCROLLS &&
              scrollAttempts < CONFIG.TIMING.MAX_SCROLL_ATTEMPTS) {
-        const currentTurnCount = document.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN).length;
+        const currentTurnCount = scrollContainer.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN).length;
         scrollContainer.scrollTop = 0;
-        await Utils.sleep(CONFIG.TIMING.SCROLL_DELAY);
+
+        const { count: newTurnCount, reason } = await Utils.waitForNewTurnsOrStable({
+          container: scrollContainer,
+          selector: CONFIG.SELECTORS.CONVERSATION_TURN,
+          previousCount: currentTurnCount,
+          stableTime: 500,
+          initialStableTime: 1200,
+          timeout: 5000
+        });
 
         const scrollTop = scrollContainer.scrollTop;
-        const newTurnCount = document.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN).length;
 
-        if (newTurnCount === currentTurnCount && (lastScrollTop === scrollTop || scrollTop === 0)) {
+        if (reason !== 'added' && newTurnCount === currentTurnCount && (lastScrollTop === scrollTop || scrollTop === 0)) {
           stableScrolls++;
         } else {
           stableScrolls = 0;

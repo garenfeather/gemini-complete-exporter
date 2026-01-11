@@ -85,6 +85,95 @@
       if (popup) popup.remove();
     },
 
+    /**
+     * 等待“对话轮次增加”或“DOM 稳定”
+     *
+     * 用于替换固定 sleep：滚动触发加载后，若 turn 数量增加立即返回；
+     * 否则等待 DOM 在 stableTime 内无变化后返回（含超时兜底）。
+     */
+    waitForNewTurnsOrStable({
+      container,
+      selector,
+      previousCount,
+      stableTime = 500,
+      initialStableTime = 1200,
+      timeout = 5000
+    }) {
+      if (!container || typeof container.querySelectorAll !== 'function') {
+        return Promise.reject(new Error('Invalid container for waitForNewTurnsOrStable'));
+      }
+      if (!selector || typeof selector !== 'string') {
+        return Promise.reject(new Error('Invalid selector for waitForNewTurnsOrStable'));
+      }
+
+      const prev = Number.isFinite(previousCount) ? previousCount : 0;
+
+      const getCount = () => container.querySelectorAll(selector).length;
+
+      const current = getCount();
+      if (current > prev) {
+        return Promise.resolve({ count: current, reason: 'added' });
+      }
+
+      return new Promise((resolve) => {
+        let finished = false;
+        let observer;
+        let stableTimer;
+        let timeoutTimer;
+        let sawMutation = false;
+        let checkScheduled = false;
+
+        const cleanup = () => {
+          if (observer) observer.disconnect();
+          if (stableTimer) clearTimeout(stableTimer);
+          if (timeoutTimer) clearTimeout(timeoutTimer);
+        };
+
+        const finish = (reason) => {
+          if (finished) return;
+          finished = true;
+          const count = getCount();
+          cleanup();
+          resolve({ count, reason });
+        };
+
+        const scheduleCheckForIncrease = () => {
+          if (checkScheduled) return;
+          checkScheduled = true;
+          Promise.resolve().then(() => {
+            checkScheduled = false;
+            const count = getCount();
+            if (count > prev) {
+              finish('added');
+            }
+          });
+        };
+
+        const resetStableTimer = () => {
+          if (stableTimer) clearTimeout(stableTimer);
+          const ms = sawMutation ? stableTime : initialStableTime;
+          stableTimer = setTimeout(() => finish('stable'), ms);
+        };
+
+        observer = new MutationObserver((mutations) => {
+          sawMutation = true;
+          resetStableTimer();
+
+          for (const mutation of mutations) {
+            if (mutation.type === 'childList' && mutation.addedNodes && mutation.addedNodes.length > 0) {
+              scheduleCheckForIncrease();
+              break;
+            }
+          }
+        });
+
+        observer.observe(container, { childList: true, subtree: true });
+
+        resetStableTimer();
+        timeoutTimer = setTimeout(() => finish('timeout'), timeout);
+      });
+    },
+
     getConversationIdFromURL() {
       // 从 URL 中提取对话 ID: gemini.google.com/app/{id}
       const urlMatch = window.location.pathname.match(/\/app\/([^\/]+)/);
