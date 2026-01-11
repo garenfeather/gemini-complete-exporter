@@ -294,7 +294,7 @@
 
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
-        Utils.createNotification(`Processing message ${i + 1} of ${turns.length}...`);
+        Utils.updateExportProgress(i + 1, turns.length);
 
         // 检查模型响应是否包含操作卡片（如果存在则跳过）
         const modelRespElem = turn.querySelector(CONFIG.SELECTORS.MODEL_RESPONSE);
@@ -387,6 +387,7 @@
      */
     async execute() {
       try {
+        Utils.clearExportProgress();
         await this.scrollToLoadAll();
 
         const turns = Array.from(document.querySelectorAll(CONFIG.SELECTORS.CONVERSATION_TURN));
@@ -424,6 +425,8 @@
         console.error('[Export] Export failed:', error.message);
         // Re-throw to let checkAutoExport catch it
         throw error;
+      } finally {
+        Utils.clearExportProgress();
       }
     }
   };

@@ -19,6 +19,62 @@ let batchExportState = {
   }
 };
 
+const ALLOWED_DOWNLOAD_PROTOCOLS = new Set(['https:']);
+const ALLOWED_DOWNLOAD_HOSTS = new Set([
+  'gemini.google.com',
+  'contribution.usercontent.google.com',
+  'lh3.googleusercontent.com'
+]);
+
+function assertAllowedDownloadUrl(url) {
+  if (!url || typeof url !== 'string') {
+    throw new Error('Invalid download URL');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch (e) {
+    throw new Error('Invalid download URL');
+  }
+
+  if (!ALLOWED_DOWNLOAD_PROTOCOLS.has(parsed.protocol)) {
+    throw new Error('Disallowed download protocol');
+  }
+
+  if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.host)) {
+    throw new Error('Disallowed download host');
+  }
+}
+
+function sanitizeDownloadFilename(filename, fallbackFilename) {
+  const raw = typeof filename === 'string' ? filename : '';
+  const fallback = typeof fallbackFilename === 'string' && fallbackFilename ? fallbackFilename : 'download';
+
+  const cleaned = raw
+    .replace(/[\u0000-\u001F\u007F]/g, '')
+    .replace(/[\\/]/g, '_')
+    .replace(/\.+/g, '.')
+    .replace(/[:*?"<>|]/g, '_')
+    .trim()
+    .replace(/^[.\s]+/, '');
+
+  const safe = cleaned || fallback;
+
+  // 限制文件名长度，尽量保留扩展名
+  const maxLen = 180;
+  if (safe.length <= maxLen) return safe;
+
+  const lastDot = safe.lastIndexOf('.');
+  if (lastDot > 0 && lastDot >= safe.length - 10) {
+    const base = safe.slice(0, lastDot);
+    const ext = safe.slice(lastDot);
+    return base.slice(0, Math.max(1, maxLen - ext.length)) + ext;
+  }
+
+  return safe.slice(0, maxLen);
+}
+
 // 记录 JSON 下载使用的 object URL，下载结束后释放
 const objectUrlsByDownloadId = new Map();
 
@@ -33,7 +89,9 @@ function revokeObjectUrlForDownload(downloadId) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[Service Worker] Received message:', message.type, message);
+  // 注意：不要在此处打印完整 message（DOWNLOAD_JSON 可能携带超大 payload）
+  const senderTabId = sender?.tab?.id;
+  console.log('[Service Worker] Received message:', message.type, senderTabId ? `tab:${senderTabId}` : '');
 
   // 批量导出相关消息
   if (message.type === 'START_BATCH_EXPORT') {
@@ -134,6 +192,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleVideoDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
+    assertAllowedDownloadUrl(url);
+
     // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
     if (!finalFilename) {
@@ -148,15 +208,20 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
       }
     }
 
+    const safeFilename = sanitizeDownloadFilename(
+      finalFilename,
+      `${conversationId}_msg${messageIndex}_video${fileIndex}.mp4`
+    );
+
     // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: finalFilename,
+      filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
-    console.log(`Download started: ${finalFilename} (ID: ${downloadId})`);
+    console.log(`Download started: ${safeFilename} (ID: ${downloadId})`);
     return downloadId;
 
   } catch (error) {
@@ -167,6 +232,8 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
 
 async function handleImageDownload({ url, filename, conversationId, messageIndex, fileIndex }) {
   try {
+    assertAllowedDownloadUrl(url);
+
     // 如果未提供，从 URL 中提取文件名
     let finalFilename = filename;
     if (!finalFilename) {
@@ -187,15 +254,23 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
       }
     }
 
+    const extMatch = String(finalFilename).match(/\.(jpg|jpeg|png|gif|webp)$/i);
+    const fallbackExt = extMatch ? extMatch[1].toLowerCase() : 'jpg';
+
+    const safeFilename = sanitizeDownloadFilename(
+      finalFilename,
+      `${conversationId}_msg${messageIndex}_image${fileIndex}.${fallbackExt}`
+    );
+
     // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: finalFilename,
+      filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
-    console.log(`Download started: ${finalFilename} (ID: ${downloadId})`);
+    console.log(`Download started: ${safeFilename} (ID: ${downloadId})`);
     return downloadId;
 
   } catch (error) {
@@ -206,19 +281,23 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
 
 async function handleGeneratedImageDownload({ url, conversationId, messageIndex, fileIndex }) {
   try {
-    // 生成的图片通常是 PNG 格式
-    const ext = 'png';
-    const finalFilename = `${conversationId}_msg${messageIndex}_generated${fileIndex}.${ext}`;
+    assertAllowedDownloadUrl(url);
+
+    const finalFilename = `${conversationId}_msg${messageIndex}_generated${fileIndex}.png`;
+    const safeFilename = sanitizeDownloadFilename(
+      finalFilename,
+      `${conversationId}_msg${messageIndex}_generated${fileIndex}.png`
+    );
 
     // 使用 chrome.downloads API
     const downloadId = await chrome.downloads.download({
       url: url,
-      filename: finalFilename,
+      filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
-    console.log(`Generated image download started: ${finalFilename} (ID: ${downloadId})`);
+    console.log(`Generated image download started: ${safeFilename} (ID: ${downloadId})`);
     return downloadId;
 
   } catch (error) {
@@ -228,7 +307,7 @@ async function handleGeneratedImageDownload({ url, conversationId, messageIndex,
 }
 
 async function handleJsonDownload({ jsonData, conversationId }) {
-  const filename = `${conversationId}.json`;
+  const filename = sanitizeDownloadFilename(`${conversationId}.json`, 'conversation.json');
 
   try {
     const jsonString = JSON.stringify(jsonData, null, 2);

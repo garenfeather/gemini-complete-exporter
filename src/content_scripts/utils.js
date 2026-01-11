@@ -9,6 +9,33 @@
   // ============================================================================
   // 工具函数
   // ============================================================================
+  const PROGRESS_POPUP_ID = 'gemini-export-progress';
+
+  function getOrCreateProgressPopup() {
+    let popup = document.getElementById(PROGRESS_POPUP_ID);
+    if (popup) return popup;
+
+    popup = document.createElement('div');
+    popup.id = PROGRESS_POPUP_ID;
+    Object.assign(popup.style, {
+      position: 'fixed',
+      top: '24px',
+      right: '24px',
+      zIndex: '99999',
+      background: '#333',
+      color: '#fff',
+      padding: '10px 18px',
+      borderRadius: '8px',
+      fontSize: '1em',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+      opacity: '0.95',
+      pointerEvents: 'none'
+    });
+
+    document.body.appendChild(popup);
+    return popup;
+  }
+
   window.Utils = {
     sleep(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
@@ -42,6 +69,20 @@
       document.body.appendChild(popup);
       setTimeout(() => popup.remove(), CONFIG.TIMING.POPUP_DURATION);
       return popup;
+    },
+
+    /**
+     * 导出进度提示（单例复用，仅显示 x/n）
+     */
+    updateExportProgress(current, total) {
+      const popup = getOrCreateProgressPopup();
+      popup.textContent = `${current}/${total}`;
+      return popup;
+    },
+
+    clearExportProgress() {
+      const popup = document.getElementById(PROGRESS_POPUP_ID);
+      if (popup) popup.remove();
     },
 
     getConversationIdFromURL() {
