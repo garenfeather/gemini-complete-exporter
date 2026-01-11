@@ -48,3 +48,23 @@ Data URL 会把整份 JSON 进行 base64 编码并生成超长字符串。对于
 1. 选择同一份大对话样本进行导出对比。
 2. 观察 console 是否仍出现 `Extension context invalidated`。
 3. 可选：用 Chrome Task Manager（`Shift+Esc`）或 service worker DevTools 的 Memory 面板对比导出期间的内存峰值。
+
+## worktree 双线快速对比
+
+当需要对比“修复前/修复后”的行为（例如内存峰值、导出是否成功）时，可以用 `git worktree` 同时检出两份工作目录，避免频繁 `checkout` 切分支。
+
+示例（基线为当前分支合并前的一个提交，修复分支为当前 HEAD）：
+
+1. 在仓库根目录创建 worktree 目录：
+   - `mkdir -p ../gemini-export-all-worktrees`
+2. 检出基线 worktree（detached HEAD）：
+   - `git worktree add --detach ../gemini-export-all-worktrees/baseline <base-commit>`
+3. 检出修复分支 worktree：
+   - `git worktree add -b perf/json-download-objecturl ../gemini-export-all-worktrees/json-objecturl HEAD`
+4. 现在可以并行做：
+   - 分别在两个目录加载“已解压扩展”进行实测
+   - 用 `git diff <base-commit>..HEAD` 精确查看代码差异
+5. 用完清理：
+   - `git worktree remove ../gemini-export-all-worktrees/baseline`
+   - `git worktree remove ../gemini-export-all-worktrees/json-objecturl`
+   - `git branch -D perf/json-download-objecturl`（如不再需要该本地分支）
