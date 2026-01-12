@@ -301,12 +301,16 @@
 
       for (let i = 0; i < turns.length; i++) {
         const turn = turns[i];
-        Utils.updateExportProgress(i + 1, turns.length);
+        const currentIndex = i + 1;
 
         // 检查模型响应是否包含操作卡片（如果存在则跳过）
         const modelRespElem = turn.querySelector(CONFIG.SELECTORS.MODEL_RESPONSE);
         if (AssistantDataService.hasActionCard(modelRespElem)) {
           // 完全跳过此轮次（用户查询和模型响应都跳过）
+          Utils.updateExportProgress(currentIndex, turns.length, {
+            imgCount: imagesToDownload.length,
+            videoCount: videosToDownload.length
+          });
           continue;
         }
 
@@ -340,6 +344,11 @@
             imagesToDownload.push(...assistantResult.imagesToDownload);
           }
         }
+
+        Utils.updateExportProgress(currentIndex, turns.length, {
+          imgCount: imagesToDownload.length,
+          videoCount: videosToDownload.length
+        });
       }
 
       // 计算轮次数和总数

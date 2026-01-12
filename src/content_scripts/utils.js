@@ -72,11 +72,23 @@
     },
 
     /**
-     * 导出进度提示（单例复用，仅显示 x/n）
+     * 导出进度提示（单例复用）
+     *
+     * @param {number} current
+     * @param {number} total
+     * @param {{ imgCount?: number, videoCount?: number }} stats
      */
-    updateExportProgress(current, total) {
+    updateExportProgress(current, total, stats = {}) {
       const popup = getOrCreateProgressPopup();
-      popup.textContent = `${current}/${total}`;
+
+      const imgCount = Number.isFinite(stats.imgCount) ? stats.imgCount : null;
+      const videoCount = Number.isFinite(stats.videoCount) ? stats.videoCount : null;
+
+      let text = `${current}/${total}`;
+      if (imgCount !== null) text += `｜img：${imgCount}`;
+      if (videoCount !== null) text += `｜video：${videoCount}`;
+
+      popup.textContent = text;
       return popup;
     },
 
