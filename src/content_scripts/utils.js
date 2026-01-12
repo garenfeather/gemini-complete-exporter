@@ -29,7 +29,8 @@
       fontSize: '1em',
       boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
       opacity: '0.95',
-      pointerEvents: 'none'
+      pointerEvents: 'none',
+      whiteSpace: 'pre-line'
     });
 
     document.body.appendChild(popup);
@@ -84,11 +85,17 @@
       const imgCount = Number.isFinite(stats.imgCount) ? stats.imgCount : null;
       const videoCount = Number.isFinite(stats.videoCount) ? stats.videoCount : null;
 
-      let text = `${current}/${total}`;
-      if (imgCount !== null) text += `｜img：${imgCount}`;
-      if (videoCount !== null) text += `｜video：${videoCount}`;
+      const parts = [];
+      parts.push(`msg：${current}/${total}`);
 
-      popup.textContent = text;
+      let mediaLine = '';
+      if (imgCount !== null) mediaLine += `img：${imgCount}`;
+      if (videoCount !== null) {
+        mediaLine += `${mediaLine ? '｜' : ''}video：${videoCount}`;
+      }
+      if (mediaLine) parts.push(mediaLine);
+
+      popup.textContent = parts.join('\n');
       return popup;
     },
 
