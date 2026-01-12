@@ -180,9 +180,8 @@
             console.error(`Video ${i + 1}/${videosToDownload.length} download failed: ${response.error}`);
           }
 
-          // 下载之间延迟以避免 Chrome 的多重下载确认
-          if (i < videosToDownload.length - 1) {
-            await Utils.sleep(500);
+          if (response.createdConfirmed === false) {
+            console.warn(`[Download] Created confirmation timeout, continuing: ${response.downloadId}`);
           }
         } catch (error) {
           console.error(`Error downloading video ${i + 1}/${videosToDownload.length}:`, error);
@@ -234,9 +233,8 @@
             console.error(`Image ${i + 1}/${imagesToDownload.length} download failed: ${response.error}`);
           }
 
-          // 下载之间延迟以避免 Chrome 的多重下载确认
-          if (i < imagesToDownload.length - 1) {
-            await Utils.sleep(500);
+          if (response.createdConfirmed === false) {
+            console.warn(`[Download] Created confirmation timeout, continuing: ${response.downloadId}`);
           }
         } catch (error) {
           console.error(`Error downloading image ${i + 1}/${imagesToDownload.length}:`, error);

@@ -75,6 +75,48 @@ function sanitizeDownloadFilename(filename, fallbackFilename) {
   return safe.slice(0, maxLen);
 }
 
+const DOWNLOAD_CREATED_TIMEOUT_MS = 4000;
+
+const downloadCreatedWaiters = new Map();
+
+function waitForDownloadCreated(downloadId, timeoutMs = DOWNLOAD_CREATED_TIMEOUT_MS) {
+  return new Promise((resolve) => {
+    let finished = false;
+    let timeoutId;
+
+    const finish = (created) => {
+      if (finished) return;
+      finished = true;
+      downloadCreatedWaiters.delete(downloadId);
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve(created);
+    };
+
+    downloadCreatedWaiters.set(downloadId, finish);
+
+    try {
+      chrome.downloads.search({ id: downloadId }, (results) => {
+        if (chrome.runtime.lastError) {
+          return;
+        }
+        if (Array.isArray(results) && results.length > 0) {
+          finish(true);
+        }
+      });
+    } catch (_) {
+      // 忽略 search 失败，兜底靠 timeout
+    }
+
+    timeoutId = setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
+async function downloadWithCreatedAck(downloadOptions) {
+  const downloadId = await chrome.downloads.download(downloadOptions);
+  const createdConfirmed = await waitForDownloadCreated(downloadId);
+  return { downloadId, createdConfirmed };
+}
+
 // 记录 JSON 下载使用的 object URL，下载结束后释放
 const objectUrlsByDownloadId = new Map();
 
@@ -87,6 +129,13 @@ function revokeObjectUrlForDownload(downloadId) {
     objectUrlsByDownloadId.delete(downloadId);
   }
 }
+
+chrome.downloads.onCreated.addListener((downloadItem) => {
+  const resolve = downloadCreatedWaiters.get(downloadItem.id);
+  if (resolve) {
+    resolve(true);
+  }
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 注意：不要在此处打印完整 message（DOWNLOAD_JSON 可能携带超大 payload）
@@ -135,8 +184,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // 下载相关消息
   if (message.type === 'DOWNLOAD_VIDEO') {
     handleVideoDownload(message.data)
-      .then(downloadId => {
-        sendResponse({ success: true, downloadId });
+      .then(({ downloadId, createdConfirmed }) => {
+        sendResponse({ success: true, downloadId, createdConfirmed });
       })
       .catch(error => {
         console.error('Download failed:', error);
@@ -149,8 +198,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'DOWNLOAD_IMAGE') {
     handleImageDownload(message.data)
-      .then(downloadId => {
-        sendResponse({ success: true, downloadId });
+      .then(({ downloadId, createdConfirmed }) => {
+        sendResponse({ success: true, downloadId, createdConfirmed });
       })
       .catch(error => {
         console.error('Download failed:', error);
@@ -163,8 +212,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'DOWNLOAD_GENERATED_IMAGE') {
     handleGeneratedImageDownload(message.data)
-      .then(downloadId => {
-        sendResponse({ success: true, downloadId });
+      .then(({ downloadId, createdConfirmed }) => {
+        sendResponse({ success: true, downloadId, createdConfirmed });
       })
       .catch(error => {
         console.error('Download failed:', error);
@@ -177,8 +226,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'DOWNLOAD_JSON') {
     handleJsonDownload(message.data)
-      .then(downloadId => {
-        sendResponse({ success: true, downloadId });
+      .then(({ downloadId, createdConfirmed }) => {
+        sendResponse({ success: true, downloadId, createdConfirmed });
       })
       .catch(error => {
         console.error('Download failed:', error);
@@ -213,16 +262,19 @@ async function handleVideoDownload({ url, filename, conversationId, messageIndex
       `${conversationId}_msg${messageIndex}_video${fileIndex}.mp4`
     );
 
-    // 使用 chrome.downloads API
-    const downloadId = await chrome.downloads.download({
+    const { downloadId, createdConfirmed } = await downloadWithCreatedAck({
       url: url,
       filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
+    if (!createdConfirmed) {
+      console.warn(`[Download] Created confirmation timeout (ID: ${downloadId})`);
+    }
+
     console.log(`Download started: ${safeFilename} (ID: ${downloadId})`);
-    return downloadId;
+    return { downloadId, createdConfirmed };
 
   } catch (error) {
     console.error('Error initiating download:', error);
@@ -262,16 +314,19 @@ async function handleImageDownload({ url, filename, conversationId, messageIndex
       `${conversationId}_msg${messageIndex}_image${fileIndex}.${fallbackExt}`
     );
 
-    // 使用 chrome.downloads API
-    const downloadId = await chrome.downloads.download({
+    const { downloadId, createdConfirmed } = await downloadWithCreatedAck({
       url: url,
       filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
+    if (!createdConfirmed) {
+      console.warn(`[Download] Created confirmation timeout (ID: ${downloadId})`);
+    }
+
     console.log(`Download started: ${safeFilename} (ID: ${downloadId})`);
-    return downloadId;
+    return { downloadId, createdConfirmed };
 
   } catch (error) {
     console.error('Error initiating download:', error);
@@ -289,16 +344,19 @@ async function handleGeneratedImageDownload({ url, conversationId, messageIndex,
       `${conversationId}_msg${messageIndex}_generated${fileIndex}.png`
     );
 
-    // 使用 chrome.downloads API
-    const downloadId = await chrome.downloads.download({
+    const { downloadId, createdConfirmed } = await downloadWithCreatedAck({
       url: url,
       filename: safeFilename,
       saveAs: false,
       conflictAction: 'uniquify'
     });
 
+    if (!createdConfirmed) {
+      console.warn(`[Download] Created confirmation timeout (ID: ${downloadId})`);
+    }
+
     console.log(`Generated image download started: ${safeFilename} (ID: ${downloadId})`);
-    return downloadId;
+    return { downloadId, createdConfirmed };
 
   } catch (error) {
     console.error('Error initiating download:', error);
@@ -326,8 +384,14 @@ async function handleJsonDownload({ jsonData, conversationId }) {
       });
 
       objectUrlsByDownloadId.set(downloadId, objectUrl);
+
+      const createdConfirmed = await waitForDownloadCreated(downloadId);
+      if (!createdConfirmed) {
+        console.warn(`[Download] Created confirmation timeout (ID: ${downloadId})`);
+      }
+
       console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
-      return downloadId;
+      return { downloadId, createdConfirmed };
     } catch (error) {
       if (objectUrl) {
         try {
@@ -354,8 +418,13 @@ async function handleJsonDownload({ jsonData, conversationId }) {
         conflictAction: 'uniquify'
       });
 
+      const createdConfirmed = await waitForDownloadCreated(downloadId);
+      if (!createdConfirmed) {
+        console.warn(`[Download] Created confirmation timeout (ID: ${downloadId})`);
+      }
+
       console.log(`JSON download started: ${filename} (ID: ${downloadId})`);
-      return downloadId;
+      return { downloadId, createdConfirmed };
     }
   } catch (error) {
     console.error('Error initiating JSON download:', error);

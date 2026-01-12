@@ -385,8 +385,9 @@
 
         if (response.success) {
           console.log(`JSON download initiated (ID: ${response.downloadId})`);
-          // 等待下载真正开始
-          await Utils.sleep(1000);
+          if (response.createdConfirmed === false) {
+            console.warn('[Export] Download created confirmation timeout, continuing anyway');
+          }
           return response.downloadId;
         } else {
           throw new Error(response.error || 'JSON download failed');
